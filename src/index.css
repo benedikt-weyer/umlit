@@ -1,16 +1,6 @@
-@tailwind base;
-
-@plugin "tailwindcss-animate";
+@import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  }
-}
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);

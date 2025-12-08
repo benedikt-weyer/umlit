@@ -15,7 +15,7 @@ export const Visualizer: React.FC = () => {
       <Canvas>
         <color attach="background" args={[theme === 'dark' ? '#0a0a0a' : '#fafafa']} />
         <OrthographicCamera makeDefault position={[0, 0, 1000]} zoom={1} near={0.1} far={2000} />
-        <MapControls enableRotate={false} />
+        <MapControls enableRotate={false} enablePan={false} />
         
         <ambientLight intensity={1} />
         

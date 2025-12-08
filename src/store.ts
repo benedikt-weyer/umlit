@@ -9,17 +9,17 @@ interface AppState {
   updateNodePosition: (id: string, x: number, y: number) => void;
 }
 
-const initialCode = `
-[A] Start @ 0,0
-[B] Process @ 200,0
-[C] End @ 400,0
-A -> B : starts
-B -> C : ends
+const DEFAULT_CODE = `[NodeA] User @ 0,0
+[NodeB] Service @ 200,0
+[NodeC] Database @ 200,150
+
+NodeA -())- NodeB
+NodeB -(()- NodeC
 `.trim();
 
 export const useStore = create<AppState>((set) => ({
-  code: initialCode,
-  diagram: parseDiagram(initialCode),
+  code: DEFAULT_CODE,
+  diagram: parseDiagram(DEFAULT_CODE),
   setCode: (code) =>
     set(() => {
       const diagram = parseDiagram(code);

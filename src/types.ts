@@ -13,6 +13,7 @@ export interface Edge {
   source: string;
   target: string;
   label?: string;
+  type?: string; // Interface types: ()--,  --(), (--, --), etc.
 }
 
 export interface Diagram {

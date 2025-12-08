@@ -21,8 +21,8 @@ export const Toolbar: React.FC = () => {
         <span className="text-sm text-muted-foreground">Text-to-Visual Diagram Editor</span>
       </div>
       <div className="flex items-center gap-2">
-        <Button onClick={toggleTheme} variant="ghost" size="sm">
-          {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+        <Button onClick={toggleTheme} variant="ghost" size="default">
+          {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
         </Button>
         <Button onClick={handleExportPng} size="sm">
           <Download className="w-4 h-4 mr-2" />

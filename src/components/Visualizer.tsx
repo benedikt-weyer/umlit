@@ -4,13 +4,16 @@ import { OrthographicCamera, MapControls } from '@react-three/drei';
 import { useStore } from '../store';
 import { Node } from './3d/Node';
 import { Edge } from './3d/Edge';
+import { useTheme } from './ThemeProvider';
 
 export const Visualizer: React.FC = () => {
   const diagram = useStore((state) => state.diagram);
+  const { theme } = useTheme();
 
   return (
-    <div className="h-full w-full bg-gray-50 relative">
+    <div className="h-full w-full bg-background relative">
       <Canvas>
+        <color attach="background" args={[theme === 'dark' ? '#0a0a0a' : '#fafafa']} />
         <OrthographicCamera makeDefault position={[0, 0, 1000]} zoom={1} near={0.1} far={2000} />
         <MapControls enableRotate={false} />
         
@@ -26,7 +29,11 @@ export const Visualizer: React.FC = () => {
         </group>
         
         {/* Grid helper for reference */}
-        <gridHelper args={[2000, 20]} rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -1]} />
+        <gridHelper 
+          args={[2000, 20, theme === 'dark' ? '#333333' : '#e5e5e5', theme === 'dark' ? '#1a1a1a' : '#f5f5f5']} 
+          rotation={[Math.PI / 2, 0, 0]} 
+          position={[0, 0, -1]} 
+        />
         <ExportHandler />
       </Canvas>
     </div>

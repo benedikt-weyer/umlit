@@ -1,60 +1,52 @@
 import React from 'react';
 import { Line, Circle } from '@react-three/drei';
+import type { Edge as EdgeType } from '../../types';
 import { useStore } from '../../store';
-import * as THREE from 'three';
+import { useTheme } from '../ThemeProvider';
 
-interface EdgeProps {
-  id: string;
-  source: string;
-  target: string;
-  label?: string;
-}
-
-export const Edge: React.FC<EdgeProps> = ({ source, target, label }) => {
-  const nodes = useStore((state) => state.diagram.nodes);
+export const Edge: React.FC<EdgeType> = ({ source, target }) => {
+  const diagram = useStore((state) => state.diagram);
+  const { theme } = useTheme();
   
-  const sourceNode = nodes.find((n) => n.id === source);
-  const targetNode = nodes.find((n) => n.id === target);
-
-  if (!sourceNode || !targetNode) return null;
-
-  const start = new THREE.Vector3(sourceNode.x, -sourceNode.y, 0);
-  const end = new THREE.Vector3(targetNode.x, -targetNode.y, 0);
-
-  // Lollipop visual: Line + Circle at the end
-  // We want the line to stop at the edge of the node, but for simplicity let's draw center to center first
-  // Or maybe just draw to the edge.
+  const fromNode = diagram.nodes.find(n => n.id === source);
+  const toNode = diagram.nodes.find(n => n.id === target);
   
-  // Simple implementation: Line from center to center
-  const points = [start, end];
+  if (!fromNode || !toNode) return null;
+
+  const lineColor = theme === 'dark' ? '#666666' : '#999999';
+  const circleColor = theme === 'dark' ? '#888888' : '#666666';
+
+  const startPoint: [number, number, number] = [fromNode.x, -fromNode.y, 1];
+  const endPoint: [number, number, number] = [toNode.x, -toNode.y, 1];
+
+  const dx = endPoint[0] - startPoint[0];
+  const dy = endPoint[1] - startPoint[1];
+  const length = Math.sqrt(dx * dx + dy * dy);
+  
+  const circleRadius = 8;
+  const offsetX = (dx / length) * circleRadius;
+  const offsetY = (dy / length) * circleRadius;
+  
+  const lineEndPoint: [number, number, number] = [
+    endPoint[0] - offsetX,
+    endPoint[1] - offsetY,
+    1
+  ];
 
   return (
     <group>
       <Line
-        points={points}
-        color="black"
+        points={[startPoint, lineEndPoint]}
+        color={lineColor}
         lineWidth={2}
       />
-      {/* Lollipop Circle at the target */}
-      <group position={end}>
-        <Circle args={[5, 32]}>
-            <meshBasicMaterial color="white" />
-        </Circle>
-        <lineSegments>
-            <edgesGeometry args={[new THREE.CircleGeometry(5, 32)]} />
-            <lineBasicMaterial color="black" />
-        </lineSegments>
-      </group>
-      {label && (
-        <group position={start.clone().lerp(end, 0.5)}>
-             {/* Label background */}
-             {/* <Plane args={[label.length * 10, 20]}>
-                 <meshBasicMaterial color="white" />
-             </Plane> */}
-             {/* Text is tricky in 2D without billboard if we rotate, but here it's flat */}
-             {/* We can use HTML overlay or just Text */}
-        </group>
-      )}
+      <Circle
+        args={[circleRadius, 32]}
+        position={endPoint}
+        rotation={[0, 0, 0]}
+      >
+        <meshBasicMaterial color={circleColor} />
+      </Circle>
     </group>
   );
 };

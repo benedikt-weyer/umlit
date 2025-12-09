@@ -3,9 +3,9 @@ import { Canvas, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { OrthographicCamera } from '@react-three/drei';
 import { useStore } from '../store';
-import { DiagramNode } from './DiagramNode';
-import { DiagramEdge } from './DiagramEdge';
-import { useTheme } from './ThemeContextProvider';
+import { Node } from './Node';
+import { Edge } from './Edge';
+import { useTheme } from '../ThemeContextProvider';
 import * as THREE from 'three';
 
 // Background plane component for camera panning and zooming
@@ -97,7 +97,7 @@ const BackgroundPlane: React.FC = () => {
   );
 };
 
-export const DiagramVisualizer: React.FC = () => {
+export const Visualizer: React.FC = () => {
   const diagram = useStore((state) => state.diagram);
   const { theme } = useTheme();
 
@@ -113,10 +113,10 @@ export const DiagramVisualizer: React.FC = () => {
         
         <group>
           {diagram.edges.map((edge) => (
-            <DiagramEdge key={edge.id} {...edge} />
+            <Edge key={edge.id} {...edge} />
           ))}
           {diagram.nodes.map((node) => (
-            <DiagramNode key={node.id} {...node} />
+            <Node key={node.id} {...node} />
           ))}
         </group>
         

@@ -1,6 +1,6 @@
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { SourceCodeEditor } from './components/SourceCodeEditor';
-import { DiagramVisualizer } from './components/DiagramVisualizer';
+import { Visualizer } from './components/diagram/Visualizer';
 import { ApplicationToolbar } from './components/ApplicationToolbar';
 import { ThemeContextProvider } from './components/ThemeContextProvider';
 
@@ -16,7 +16,7 @@ function App() {
             </Panel>
             <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors" />
             <Panel minSize={30}>
-              <DiagramVisualizer />
+              <Visualizer />
             </Panel>
           </PanelGroup>
         </div>

@@ -1,11 +1,11 @@
 import React from 'react';
-import { Line } from '@react-three/drei';
+import { Line, Text } from '@react-three/drei';
 import type { Edge as EdgeType } from '../../types';
 import { useStore } from '../../store';
 import { useTheme } from '../ThemeContextProvider';
 import * as THREE from 'three';
 
-export const Edge: React.FC<EdgeType> = ({ source, target, type }) => {
+export const Edge: React.FC<EdgeType> = ({ source, target, type, isDelegate, stereotype, sourcePort, targetPort }) => {
   const diagram = useStore((state) => state.diagram);
   const { theme } = useTheme();
   
@@ -17,8 +17,9 @@ export const Edge: React.FC<EdgeType> = ({ source, target, type }) => {
   const lineColor = theme === 'dark' ? '#666666' : '#999999';
   const symbolColor = theme === 'dark' ? '#888888' : '#666666';
   const bgColor = theme === 'dark' ? '#0a0a0a' : '#fafafa';
+  const textColor = theme === 'dark' ? '#ffffff' : '#000000';
 
-  // Node dimensions (from DiagramNode component)
+  // Node dimensions (from Node component)
   const nodeWidth = 150;
   const nodeHeight = 80;
 
@@ -172,6 +173,55 @@ export const Edge: React.FC<EdgeType> = ({ source, target, type }) => {
     }
   };
 
+  // For delegate arrows, render dashed line
+  if (isDelegate) {
+    // Create dashed line material
+    const dashedMaterial = new THREE.LineDashedMaterial({
+      color: lineColor,
+      dashSize: 5,
+      gapSize: 3,
+      linewidth: 2
+    });
+
+    const centerX = (startPoint[0] + endPoint[0]) / 2;
+    const centerY = (startPoint[1] + endPoint[1]) / 2;
+
+    return (
+      <group>
+        {/* Dashed line for delegate arrow */}
+        <Line
+          points={[startPoint, endPoint]}
+          color={lineColor}
+          lineWidth={2}
+          dashed
+          dashScale={1}
+          dashSize={5}
+          gapSize={3}
+        />
+        
+        {/* <<delegate>> stereotype label */}
+        {stereotype && (
+          <Text
+            position={[centerX, centerY + 10, 1.5]}
+            fontSize={10}
+            color={textColor}
+            anchorX="center"
+            anchorY="middle"
+          >
+            {`<<${stereotype}>>`}
+          </Text>
+        )}
+        
+        {/* Arrow head at target */}
+        <mesh position={endPoint} rotation={[0, 0, angle]}>
+          <coneGeometry args={[3, 8, 3]} />
+          <meshBasicMaterial color={lineColor} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Regular edges with interface symbols
   return (
     <group>
       {/* Line segment from start to left symbol */}

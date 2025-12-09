@@ -115,8 +115,18 @@ export const Visualizer: React.FC = () => {
           {diagram.edges.map((edge) => (
             <Edge key={edge.id} {...edge} />
           ))}
-          {diagram.nodes.map((node) => (
-            <Node key={node.id} {...node} />
+          {/* Only render root nodes (depth 0), children will be rendered recursively */}
+          {diagram.nodes.filter(node => !node.parentId).map((node) => (
+            <Node 
+              key={node.id} 
+              id={node.id}
+              label={node.label}
+              x={node.x}
+              y={node.y}
+              parentId={node.parentId}
+              depth={node.depth}
+              children={node.children}
+            />
           ))}
         </group>
         

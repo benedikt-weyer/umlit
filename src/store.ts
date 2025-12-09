@@ -10,10 +10,16 @@ interface AppState {
 }
 
 const DEFAULT_CODE = `[NodeA] User @ 0,0
-[NodeB] Service @ 200,0
-[NodeC] Database @ 200,150
+[NodeB] Service @ 200,0 {
+  [NodeB1] Handler @ 220,20
+  [NodeB2] Logic @ 220,80
+  port [p1] on [NodeB] left : API
+  NodeB1 -> NodeB2
+}
+[NodeC] Database @ 200,200
 
 NodeA -())- NodeB
+NodeB.p1 ->delegate-> NodeB1
 NodeB -(()- NodeC
 `.trim();
 

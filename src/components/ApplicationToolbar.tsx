@@ -1,12 +1,13 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Moon, Sun } from 'lucide-react';
+import { Download, Moon, Sun, LayoutGrid } from 'lucide-react';
 import { useTheme } from './ThemeContextProvider';
 import { useStore } from '../store';
 
 export const ApplicationToolbar: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const diagramType = useStore((state) => state.diagram.type);
+  const autoLayout = useStore((state) => state.autoLayout);
   
   const handleExportPng = () => {
     window.dispatchEvent(new CustomEvent('export-png'));
@@ -14,6 +15,10 @@ export const ApplicationToolbar: React.FC = () => {
 
   const handleExportSvg = () => {
     window.dispatchEvent(new CustomEvent('export-svg'));
+  };
+
+  const handleAutoLayout = () => {
+    autoLayout();
   };
 
   return (
@@ -26,6 +31,10 @@ export const ApplicationToolbar: React.FC = () => {
         </span>
       </div>
       <div className="flex items-center gap-2">
+        <Button onClick={handleAutoLayout} variant="outline" size="sm">
+          <LayoutGrid className="w-4 h-4 mr-2" />
+          Auto Layout
+        </Button>
         <Button onClick={toggleTheme} variant="ghost" size="default">
           {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
         </Button>

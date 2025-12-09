@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import { parseDiagram } from './parser';
 import type { Diagram } from './types';
+import { autoLayoutNodes, updateCodeWithPositions } from './utils/autoLayout';
 
 interface AppState {
   code: string;
   diagram: Diagram;
   setCode: (code: string) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
+  autoLayout: () => void;
 }
 
 const DEFAULT_CODE = `[uml2.5-component] {
@@ -94,6 +96,19 @@ export const useStore = create<AppState>((set) => ({
       return {
         code: newCode,
         diagram: { ...state.diagram, nodes: newNodes, type: state.diagram.type },
+      };
+    }),
+  autoLayout: () =>
+    set((state) => {
+      // Apply auto-layout algorithm
+      const layoutedNodes = autoLayoutNodes(state.diagram.nodes);
+      
+      // Update code with new positions
+      const newCode = updateCodeWithPositions(state.code, layoutedNodes);
+      
+      return {
+        code: newCode,
+        diagram: { ...state.diagram, nodes: layoutedNodes },
       };
     }),
 }));

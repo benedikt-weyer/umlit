@@ -23,7 +23,6 @@ export const Node: React.FC<NodeProps> = ({ id, label, x, y }) => {
   const bgColor = theme === 'dark' ? '#1f1f1f' : '#ffffff';
   const borderColor = theme === 'dark' ? '#666666' : '#cccccc';
   const textColor = theme === 'dark' ? '#ffffff' : '#000000';
-  const iconBg = theme === 'dark' ? '#333333' : '#dddddd';
 
   const position: [number, number, number] = [x, -y, 0];
 

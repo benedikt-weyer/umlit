@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import { Text, Plane } from '@react-three/drei';
-import { useStore } from '../../store';
-import { useTheme } from '../ThemeContextProvider';
+import { useStore } from '../store';
+import { useTheme } from './ThemeContextProvider';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 

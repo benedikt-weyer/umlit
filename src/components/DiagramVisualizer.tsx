@@ -2,8 +2,8 @@ import React from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrthographicCamera, MapControls } from '@react-three/drei';
 import { useStore } from '../store';
-import { DiagramNode } from './3d/DiagramNode';
-import { DiagramEdge } from './3d/DiagramEdge';
+import { DiagramNode } from './DiagramNode';
+import { DiagramEdge } from './DiagramEdge';
 import { useTheme } from './ThemeContextProvider';
 
 export const DiagramVisualizer: React.FC = () => {

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Line } from '@react-three/drei';
 import type { Edge as EdgeType } from '../../types';
-import { useStore } from '../../store';
-import { useTheme } from '../ThemeContextProvider';
+import { useStore } from '../store';
+import { useTheme } from './ThemeContextProvider';
 import * as THREE from 'three';
 
 export const DiagramEdge: React.FC<EdgeType> = ({ source, target, type }) => {

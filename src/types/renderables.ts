@@ -1,17 +1,14 @@
-// Renderable types - draw instructions with absolute positioning
-export type RenderableType = 
-  | 'rectangle'
-  | 'text'
-  | 'port'
-  | 'edge'
-  | 'book-icon';
+// Flat, absolute-positioned draw instructions
+// These are NOT tree objects - they are simple draw commands
 
-export interface BaseRenderable {
+export type RenderableType = 'rectangle' | 'text' | 'port' | 'book-icon' | 'edge';
+
+interface BaseRenderable {
   id: string;
   type: RenderableType;
-  zIndex: number; // For layering
-  x: number; // Absolute world position
-  y: number; // Absolute world position
+  zIndex: number;
+  x: number; // Absolute position
+  y: number; // Absolute position
 }
 
 export interface RectangleRenderable extends BaseRenderable {
@@ -20,10 +17,10 @@ export interface RectangleRenderable extends BaseRenderable {
   height: number;
   fillColor: string;
   strokeColor: string;
-  transparent: boolean;
-  opacity: number;
-  nodeId: string; // Reference to the node this belongs to
-  isDraggable: boolean;
+  transparent?: boolean;
+  opacity?: number;
+  nodeId?: string; // For drag handling
+  isDraggable?: boolean;
 }
 
 export interface TextRenderable extends BaseRenderable {
@@ -40,22 +37,8 @@ export interface PortRenderable extends BaseRenderable {
   size: number;
   color: string;
   strokeColor: string;
-  portId: string;
+  portId: string; // For edge connections
   label?: string;
-}
-
-export interface EdgeRenderable extends BaseRenderable {
-  type: 'edge';
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  color: string;
-  lineWidth: number;
-  edgeType?: string; // Interface symbols
-  isDelegate?: boolean;
-  stereotype?: string;
-  dashed?: boolean;
 }
 
 export interface BookIconRenderable extends BaseRenderable {
@@ -64,12 +47,27 @@ export interface BookIconRenderable extends BaseRenderable {
   strokeColor: string;
 }
 
+export interface EdgeRenderable extends BaseRenderable {
+  type: 'edge';
+  points: [number, number][];
+  color: string;
+  lineWidth: number;
+  dashed?: boolean;
+  dashSize?: number;
+  gapSize?: number;
+  symbolLeft?: 'ball' | 'socket-left' | 'socket-right';
+  symbolRight?: 'ball' | 'socket-left' | 'socket-right';
+  symbolColor?: string;
+  symbolBgColor?: string;
+  label?: string;
+  labelColor?: string;
+}
+
 export type Renderable = 
   | RectangleRenderable
   | TextRenderable
   | PortRenderable
-  | EdgeRenderable
-  | BookIconRenderable;
+  | BookIconRenderable
+  | EdgeRenderable;
 
 export type RenderStack = Renderable[];
-

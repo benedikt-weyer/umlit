@@ -66,8 +66,8 @@ export const DiagramEdge: React.FC<EdgeType> = ({ source, target, type }) => {
   const startPoint: [number, number, number] = [startX, startY, 1];
   const endPoint: [number, number, number] = [endX, endY, 1];
 
-  const symbolRadius = 8;
-  const symbolGap = 10; // Gap between symbols
+  const ballRadius = 12; // Full circle (ball)
+  const socketRadius = 16; // Half circle (socket) - bigger than ball
   
   const dx = endPoint[0] - startPoint[0];
   const dy = endPoint[1] - startPoint[1];
@@ -112,42 +112,36 @@ export const DiagramEdge: React.FC<EdgeType> = ({ source, target, type }) => {
     }
   }
 
-  // Calculate center position
+  // Calculate center position - both symbols share the same center
   const centerX = (startPoint[0] + endPoint[0]) / 2;
   const centerY = (startPoint[1] + endPoint[1]) / 2;
 
-  // Calculate positions for symbols with gap
-  const leftSymbolX = centerX - (dx / length) * (symbolRadius + symbolGap / 2);
-  const leftSymbolY = centerY - (dy / length) * (symbolRadius + symbolGap / 2);
-  const rightSymbolX = centerX + (dx / length) * (symbolRadius + symbolGap / 2);
-  const rightSymbolY = centerY + (dy / length) * (symbolRadius + symbolGap / 2);
+  // Both symbols at the same position (same center point)
+  const symbolPos: [number, number, number] = [centerX, centerY, 1];
 
-  const leftSymbolPos: [number, number, number] = [leftSymbolX, leftSymbolY, 1];
-  const rightSymbolPos: [number, number, number] = [rightSymbolX, rightSymbolY, 1];
+  // Calculate line break points based on the larger socket radius
+  const lineBreakLeftX = centerX - (dx / length) * socketRadius;
+  const lineBreakLeftY = centerY - (dy / length) * socketRadius;
+  const lineBreakRightX = centerX + (dx / length) * socketRadius;
+  const lineBreakRightY = centerY + (dy / length) * socketRadius;
 
-  // Calculate line break points (at the edge of the symbols, touching them)
-  const lineBreakLeftX = centerX - (dx / length) * (symbolRadius * 2 + symbolGap / 2);
-  const lineBreakLeftY = centerY - (dy / length) * (symbolRadius * 2 + symbolGap / 2);
-  const lineBreakRightX = centerX + (dx / length) * (symbolRadius * 2 + symbolGap / 2);
-  const lineBreakRightY = centerY + (dy / length) * (symbolRadius * 2 + symbolGap / 2);
-
-  const renderSymbol = (pos: [number, number, number], symbolType: 'full' | 'left' | 'right', isLeftSide: boolean) => {
+  const renderSymbol = (symbolType: 'full' | 'left' | 'right', isLeftSide: boolean) => {
     if (symbolType === 'full') {
-      // Full hollow circle
+      // Full hollow circle (ball)
       return (
         <>
-          <mesh position={pos}>
-            <circleGeometry args={[symbolRadius, 32]} />
+          <mesh position={symbolPos}>
+            <circleGeometry args={[ballRadius, 32]} />
             <meshBasicMaterial color={bgColor} />
           </mesh>
-          <mesh position={pos}>
-            <ringGeometry args={[symbolRadius - 1, symbolRadius, 32]} />
+          <mesh position={symbolPos}>
+            <ringGeometry args={[ballRadius - 1, ballRadius, 32]} />
             <meshBasicMaterial color={symbolColor} />
           </mesh>
         </>
       );
     } else {
-      // Half circle - should open towards the center
+      // Half circle (socket) - bigger than ball
       // ringGeometry at 0 rotation opens to the right (⊂)
       // We need to rotate based on line angle and which side we're on
       
@@ -170,8 +164,8 @@ export const DiagramEdge: React.FC<EdgeType> = ({ source, target, type }) => {
       }
       
       return (
-        <mesh position={pos} rotation={[0, 0, rotation]}>
-          <ringGeometry args={[symbolRadius - 1, symbolRadius, 32, 1, 0, Math.PI]} />
+        <mesh position={symbolPos} rotation={[0, 0, rotation]}>
+          <ringGeometry args={[socketRadius - 1, socketRadius, 32, 1, 0, Math.PI]} />
           <meshBasicMaterial color={symbolColor} side={THREE.DoubleSide} />
         </mesh>
       );
@@ -195,10 +189,10 @@ export const DiagramEdge: React.FC<EdgeType> = ({ source, target, type }) => {
       />
       
       {/* Render left symbol */}
-      {leftSymbol && renderSymbol(leftSymbolPos, leftSymbol, true)}
+      {leftSymbol && renderSymbol(leftSymbol, true)}
       
       {/* Render right symbol */}
-      {rightSymbol && renderSymbol(rightSymbolPos, rightSymbol, false)}
+      {rightSymbol && renderSymbol(rightSymbol, false)}
     </group>
   );
 };

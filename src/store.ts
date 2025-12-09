@@ -12,23 +12,38 @@ interface AppState {
 }
 
 const DEFAULT_CODE = `[uml2.5-component] {
-  [NodeA] User @ 0,0
-  [NodeB] Service @ 200,0 {
-    [NodeB1] Handler @ 220,20
-    [NodeB2] Logic @ 220,80
+  [NodeA] User
+  [NodeB] Service {
+    [NodeB1] Handler
+    [NodeB2] Logic
     port [p1] on [NodeB] left : API
     NodeB1 -> NodeB2
   }
-  [NodeC] Database @ 200,200
+  [NodeC] Database
 
   NodeA -())- NodeB
   NodeB.p1 ->delegate-> NodeB1
   NodeB -(()- NodeC
 }`.trim();
 
+// Initialize with auto-layout applied
+const initializeDiagram = () => {
+  const initialDiagram = parseDiagram(DEFAULT_CODE);
+  const layoutedNodes = autoLayoutNodes(initialDiagram.nodes);
+  const layoutedCode = updateCodeWithPositions(DEFAULT_CODE, layoutedNodes);
+  const layoutedDiagram = parseDiagram(layoutedCode);
+  
+  return {
+    code: layoutedCode,
+    diagram: layoutedDiagram
+  };
+};
+
+const initialState = initializeDiagram();
+
 export const useStore = create<AppState>((set) => ({
-  code: DEFAULT_CODE,
-  diagram: parseDiagram(DEFAULT_CODE),
+  code: initialState.code,
+  diagram: initialState.diagram,
   setCode: (code) =>
     set(() => {
       const diagram = parseDiagram(code);

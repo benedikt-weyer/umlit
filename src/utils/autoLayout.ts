@@ -14,21 +14,11 @@ const DEFAULT_CONFIG: LayoutConfig = {
   startY: 50
 };
 
-// Calculate node dimensions including children
-function getNodeBounds(node: Node, allNodes: Node[]): { width: number; height: number } {
-  const hasChildren = node.children && node.children.length > 0;
-  
-  if (!hasChildren) {
-    return { width: 150, height: 80 };
-  }
-  
-  const childNodes = allNodes.filter(n => n.parentId === node.id);
+// Simple: calculate bounding box from child positions
+function getBoundingBox(childNodes: Node[], allNodes: Node[]): { width: number; height: number; minY: number; maxY: number } {
   if (childNodes.length === 0) {
-    return { width: 150, height: 80 };
+    return { width: 150, height: 80, minY: 0, maxY: 0 };
   }
-  
-  const padding = 20;
-  const labelSpace = 30;
   
   let minX = Infinity, maxX = -Infinity;
   let minY = Infinity, maxY = -Infinity;
@@ -41,8 +31,46 @@ function getNodeBounds(node: Node, allNodes: Node[]): { width: number; height: n
     maxY = Math.max(maxY, child.y + childBounds.height / 2);
   });
   
-  const width = Math.max(200, (maxX - minX) + padding * 2);
-  const height = Math.max(120, (maxY - minY) + padding * 2 + labelSpace);
+  const sidePadding = 20;
+  const labelSpace = 35;
+  const verticalPadding = 20;
+  
+  const width = Math.max(200, (maxX - minX) + sidePadding * 2);
+  const height = Math.max(120, (maxY - minY) + verticalPadding * 2 + labelSpace);
+  
+  return { width, height, minY, maxY };
+}
+
+// Calculate node dimensions including children (for rendering)
+function getNodeBounds(node: Node, allNodes: Node[]): { width: number; height: number } {
+  const hasChildren = node.children && node.children.length > 0;
+  
+  if (!hasChildren) {
+    return { width: 150, height: 80 };
+  }
+  
+  const childNodes = allNodes.filter(n => n.parentId === node.id);
+  if (childNodes.length === 0) {
+    return { width: 150, height: 80 };
+  }
+  
+  const sidePadding = 20;
+  const labelSpace = 35;
+  const verticalPadding = 20;
+  
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  
+  childNodes.forEach(child => {
+    const childBounds = getNodeBounds(child, allNodes);
+    minX = Math.min(minX, child.x - childBounds.width / 2);
+    maxX = Math.max(maxX, child.x + childBounds.width / 2);
+    minY = Math.min(minY, child.y - childBounds.height / 2);
+    maxY = Math.max(maxY, child.y + childBounds.height / 2);
+  });
+  
+  const width = Math.max(200, (maxX - minX) + sidePadding * 2);
+  const height = Math.max(120, (maxY - minY) + verticalPadding * 2 + labelSpace);
   
   return { width, height };
 }
@@ -52,29 +80,54 @@ function layoutChildrenInParent(parentId: string, parentX: number, parentY: numb
   const children = nodes.filter(n => n.parentId === parentId);
   if (children.length === 0) return nodes;
   
-  const newNodes = [...nodes];
-  const childSpacing = 40;
-  const padding = 30;
+  let newNodes = [...nodes];
+  const childSpacing = 30;
   
-  // Simple vertical layout for children
-  let currentY = parentY - 50; // Start near top of parent (below label)
+  // Position children in a simple vertical stack
+  let currentY = parentY;
   
   children.forEach((child, index) => {
-    const childBounds = getNodeBounds(child, newNodes);
+    const childBounds = getNodeBounds(newNodes.find(n => n.id === child.id) || child, newNodes);
     
-    // Position child
-    const childX = parentX;
-    const childY = currentY + childBounds.height / 2;
-    
-    const childIndex = newNodes.findIndex(n => n.id === child.id);
-    if (childIndex !== -1) {
-      newNodes[childIndex] = { ...newNodes[childIndex], x: childX, y: childY };
-      
-      // Recursively layout grandchildren
-      layoutChildrenInParent(child.id, childX, childY, newNodes);
+    // First child starts at currentY
+    if (index === 0) {
+      currentY = parentY + childBounds.height / 2;
     }
     
-    currentY += childBounds.height + childSpacing;
+    const childX = parentX;
+    const childY = currentY;
+    
+    // Update child position
+    const childIndex = newNodes.findIndex(n => n.id === child.id);
+    if (childIndex !== -1) {
+      const deltaX = childX - (newNodes[childIndex].x || 0);
+      const deltaY = childY - (newNodes[childIndex].y || 0);
+      
+      newNodes[childIndex] = { ...newNodes[childIndex], x: childX, y: childY };
+      
+      // Recursively layout and move descendants
+      newNodes = layoutChildrenInParent(child.id, childX, childY, newNodes);
+      
+      // Move all descendants by delta
+      const moveDescendants = (nodeId: string) => {
+        const descendants = newNodes.filter(n => n.parentId === nodeId);
+        descendants.forEach(desc => {
+          const descIndex = newNodes.findIndex(n => n.id === desc.id);
+          if (descIndex !== -1) {
+            newNodes[descIndex] = {
+              ...newNodes[descIndex],
+              x: newNodes[descIndex].x + deltaX,
+              y: newNodes[descIndex].y + deltaY
+            };
+          }
+          moveDescendants(desc.id);
+        });
+      };
+      moveDescendants(child.id);
+    }
+    
+    // Move to next position
+    currentY += childBounds.height / 2 + childSpacing + (index < children.length - 1 ? getNodeBounds(newNodes.find(n => n.id === children[index + 1].id) || children[index + 1], newNodes).height / 2 : 0);
   });
   
   return newNodes;
@@ -84,25 +137,6 @@ function layoutChildrenInParent(parentId: string, parentX: number, parentY: numb
 export function autoLayoutNodes(nodes: Node[], config: Partial<LayoutConfig> = {}): Node[] {
   const cfg = { ...DEFAULT_CONFIG, ...config };
   let newNodes = [...nodes];
-  
-  // First, layout children within their parents (bottom-up)
-  const layoutAllChildren = (nodeList: Node[]): Node[] => {
-    let result = [...nodeList];
-    
-    // Get all nodes that have children
-    const parentsWithChildren = result.filter(n => {
-      const hasChildren = n.children && n.children.length > 0;
-      const actualChildren = result.filter(c => c.parentId === n.id);
-      return hasChildren || actualChildren.length > 0;
-    });
-    
-    // Layout children for each parent
-    parentsWithChildren.forEach(parent => {
-      result = layoutChildrenInParent(parent.id, parent.x || 0, parent.y || 0, result);
-    });
-    
-    return result;
-  };
   
   // Get root nodes (nodes without parents)
   const rootNodes = newNodes.filter(n => !n.parentId);
@@ -117,14 +151,24 @@ export function autoLayoutNodes(nodes: Node[], config: Partial<LayoutConfig> = {
     const row = Math.floor(index / cols);
     const col = index % cols;
     
-    const bounds = getNodeBounds(rootNode, newNodes);
+    // Calculate initial position for root
+    const tempX = rootNode.x || 0;
+    const tempY = rootNode.y || 0;
     
+    // Layout children first at temp position
+    newNodes = layoutChildrenInParent(rootNode.id, tempX, tempY, newNodes);
+    
+    // Now get actual bounds from child positions
+    const children = newNodes.filter(n => n.parentId === rootNode.id);
+    const bounds = children.length > 0 ? getBoundingBox(children, newNodes) : { width: 150, height: 80 };
+    
+    // Calculate final grid position
     const newX = cfg.startX + col * (bounds.width + cfg.horizontalSpacing);
     const newY = cfg.startY + row * (bounds.height + cfg.verticalSpacing);
     
-    // Calculate delta for this root node
-    const deltaX = newX - (rootNode.x || 0);
-    const deltaY = newY - (rootNode.y || 0);
+    // Calculate delta to move from temp to final position
+    const deltaX = newX - tempX;
+    const deltaY = newY - tempY;
     
     // Update root node position
     const nodeIndex = newNodes.findIndex(n => n.id === rootNode.id);
@@ -132,8 +176,22 @@ export function autoLayoutNodes(nodes: Node[], config: Partial<LayoutConfig> = {
       newNodes[nodeIndex] = { ...newNodes[nodeIndex], x: newX, y: newY };
     }
     
-    // Layout children relative to parent
-    newNodes = layoutChildrenInParent(rootNode.id, newX, newY, newNodes);
+    // Move all descendants by the delta
+    const moveAllDescendants = (parentId: string) => {
+      const descendants = newNodes.filter(n => n.parentId === parentId);
+      descendants.forEach(desc => {
+        const descIndex = newNodes.findIndex(n => n.id === desc.id);
+        if (descIndex !== -1) {
+          newNodes[descIndex] = {
+            ...newNodes[descIndex],
+            x: newNodes[descIndex].x + deltaX,
+            y: newNodes[descIndex].y + deltaY
+          };
+        }
+        moveAllDescendants(desc.id);
+      });
+    };
+    moveAllDescendants(rootNode.id);
   });
   
   return newNodes;
@@ -141,7 +199,7 @@ export function autoLayoutNodes(nodes: Node[], config: Partial<LayoutConfig> = {
 
 // Update code with new positions
 export function updateCodeWithPositions(code: string, nodes: Node[]): string {
-  let newCode = code;
+  const newCode = code;
   const lines = newCode.split('\n');
   
   const newLines = lines.map(line => {

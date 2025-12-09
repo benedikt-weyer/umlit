@@ -14,8 +14,9 @@ function getNodeDimensions(node: Node, allNodes: Node[]): { width: number; heigh
     return { width: 150, height: 80 };
   }
   
-  const padding = 20;
-  const labelSpace = 30;
+  const sidePadding = 20;
+  const labelSpace = 35;
+  const verticalPadding = 20;
   
   let minX = Infinity, maxX = -Infinity;
   let minY = Infinity, maxY = -Infinity;
@@ -28,8 +29,8 @@ function getNodeDimensions(node: Node, allNodes: Node[]): { width: number; heigh
     maxY = Math.max(maxY, child.y + childDims.height / 2);
   });
   
-  const width = Math.max(200, (maxX - minX) + padding * 2);
-  const height = Math.max(120, (maxY - minY) + padding * 2 + labelSpace);
+  const width = Math.max(200, (maxX - minX) + sidePadding * 2);
+  const height = Math.max(120, (maxY - minY) + verticalPadding * 2 + labelSpace);
   
   return { width, height };
 }

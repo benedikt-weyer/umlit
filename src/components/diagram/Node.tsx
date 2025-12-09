@@ -18,7 +18,7 @@ function getNodeWidth(nodeId: string, allNodes: NodeType[]): number {
   const childNodes = allNodes.filter(n => n.parentId === nodeId);
   if (childNodes.length === 0) return 150;
   
-  const padding = 20;
+  const sidePadding = 20;
   let minX = Infinity, maxX = -Infinity;
   
   childNodes.forEach(child => {
@@ -27,7 +27,7 @@ function getNodeWidth(nodeId: string, allNodes: NodeType[]): number {
     maxX = Math.max(maxX, child.x + childWidth / 2);
   });
   
-  return Math.max(200, (maxX - minX) + padding * 2);
+  return Math.max(200, (maxX - minX) + sidePadding * 2);
 }
 
 // Helper function to recursively calculate node height
@@ -41,8 +41,8 @@ function getNodeHeight(nodeId: string, allNodes: NodeType[]): number {
   const childNodes = allNodes.filter(n => n.parentId === nodeId);
   if (childNodes.length === 0) return 80;
   
-  const padding = 20;
-  const labelSpace = 30;
+  const verticalPadding = 20;
+  const labelSpace = 35;
   let minY = Infinity, maxY = -Infinity;
   
   childNodes.forEach(child => {
@@ -51,7 +51,7 @@ function getNodeHeight(nodeId: string, allNodes: NodeType[]): number {
     maxY = Math.max(maxY, child.y + childHeight / 2);
   });
   
-  return Math.max(120, (maxY - minY) + padding * 2 + labelSpace);
+  return Math.max(120, (maxY - minY) + verticalPadding * 2 + labelSpace);
 }
 
 interface NodeProps {
@@ -86,8 +86,9 @@ export const Node: React.FC<NodeProps> = ({ id, label, x, y, parentId, depth = 0
   let nodeHeight = 80;
   
   if (hasChildren && childNodes.length > 0) {
-    const padding = 20; // Padding around children
-    const labelSpace = 30; // Space for the label at the top
+    const sidePadding = 20;
+    const labelSpace = 35;
+    const verticalPadding = 20;
     
     // Calculate bounds of all children
     let minX = Infinity, maxX = -Infinity;
@@ -108,8 +109,8 @@ export const Node: React.FC<NodeProps> = ({ id, label, x, y, parentId, depth = 0
     const contentWidth = maxX - minX;
     const contentHeight = maxY - minY;
     
-    nodeWidth = Math.max(200, contentWidth + padding * 2);
-    nodeHeight = Math.max(120, contentHeight + padding * 2 + labelSpace);
+    nodeWidth = Math.max(200, contentWidth + sidePadding * 2);
+    nodeHeight = Math.max(120, contentHeight + verticalPadding * 2 + labelSpace);
   }
 
   // Get parent node if exists

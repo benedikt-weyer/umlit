@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { OrthographicCamera } from '@react-three/drei';
-import { useStore } from '../store';
+import { useStore } from '../../store';
 import { Node } from './Node';
 import { Edge } from './Edge';
 import { useTheme } from '../ThemeContextProvider';
@@ -133,7 +133,7 @@ export const Visualizer: React.FC = () => {
 };
 
 // Helper component to access Three.js context
-import { generateSVG, downloadStringAsFile } from '../utils/export';
+import { generateSVG, downloadStringAsFile } from '../../utils/export';
 
 const ExportHandler = () => {
   const { gl, scene, camera } = useThree();

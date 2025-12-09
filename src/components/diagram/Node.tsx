@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import { Text, Plane } from '@react-three/drei';
-import { useStore } from '../store';
+import { useStore } from '../../store';
 import { useTheme } from '../ThemeContextProvider';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -88,11 +88,31 @@ export const Node: React.FC<NodeProps> = ({ id, label, x, y }) => {
       >
         {label}
       </Text>
-      <Plane position={[-50, 0, 0.1]} args={[20, 20]}>
-        <meshBasicMaterial color={iconBg} />
+      {/* Book icon - 3 rectangles */}
+      {/* Main book cover */}
+      <Plane position={[57, 0, 0.2]} args={[14, 18]}>
+        <meshBasicMaterial color={textColor} />
         <lineSegments>
-           <edgesGeometry args={[new THREE.PlaneGeometry(20, 20)]} />
-           <lineBasicMaterial color={borderColor} />
+          <edgesGeometry args={[new THREE.PlaneGeometry(14, 18)]} />
+          <lineBasicMaterial color={borderColor} />
+        </lineSegments>
+      </Plane>
+      
+      {/* Binding rectangle 1 (top) - on the left edge of book */}
+      <Plane position={[50.5, 5, 0.3]} args={[3, 6]}>
+        <meshBasicMaterial color={textColor} />
+        <lineSegments>
+          <edgesGeometry args={[new THREE.PlaneGeometry(3, 6)]} />
+          <lineBasicMaterial color={borderColor} />
+        </lineSegments>
+      </Plane>
+      
+      {/* Binding rectangle 2 (bottom) - on the left edge of book */}
+      <Plane position={[50.5, -5, 0.3]} args={[3, 6]}>
+        <meshBasicMaterial color={textColor} />
+        <lineSegments>
+          <edgesGeometry args={[new THREE.PlaneGeometry(3, 6)]} />
+          <lineBasicMaterial color={borderColor} />
         </lineSegments>
       </Plane>
     </group>

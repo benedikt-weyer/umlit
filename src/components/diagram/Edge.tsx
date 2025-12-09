@@ -1,7 +1,7 @@
 import React from 'react';
 import { Line } from '@react-three/drei';
-import type { Edge as EdgeType } from '../types';
-import { useStore } from '../store';
+import type { Edge as EdgeType } from '../../types';
+import { useStore } from '../../store';
 import { useTheme } from '../ThemeContextProvider';
 import * as THREE from 'three';
 

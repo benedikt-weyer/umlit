@@ -1,27 +1,27 @@
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { Editor } from './components/Editor';
-import { Visualizer } from './components/Visualizer';
-import { Toolbar } from './components/Toolbar';
-import { ThemeProvider } from './components/ThemeProvider';
+import { SourceCodeEditor } from './components/SourceCodeEditor';
+import { DiagramVisualizer } from './components/DiagramVisualizer';
+import { ApplicationToolbar } from './components/ApplicationToolbar';
+import { ThemeContextProvider } from './components/ThemeContextProvider';
 
 function App() {
   return (
-    <ThemeProvider>
+    <ThemeContextProvider>
       <div className="h-screen w-screen overflow-hidden flex flex-col">
-        <Toolbar />
+        <ApplicationToolbar />
         <div className="flex-1 overflow-hidden">
           <PanelGroup direction="horizontal">
             <Panel defaultSize={30} minSize={20}>
-              <Editor />
+              <SourceCodeEditor />
             </Panel>
             <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors" />
             <Panel minSize={30}>
-              <Visualizer />
+              <DiagramVisualizer />
             </Panel>
           </PanelGroup>
         </div>
       </div>
-    </ThemeProvider>
+    </ThemeContextProvider>
   );
 }
 

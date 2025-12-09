@@ -9,7 +9,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export const ThemeContextProviderComponent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ThemeContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
     const stored = localStorage.getItem('theme') as Theme | null;
     return stored || 'light';
@@ -39,7 +39,7 @@ export const ThemeContextProviderComponent: React.FC<{ children: React.ReactNode
 export const useTheme = () => {
   const context = useContext(ThemeContext);
   if (!context) {
-    throw new Error('useTheme must be used within ThemeContextProviderComponent');
+    throw new Error('useTheme must be used within ThemeContextProvider');
   }
   return context;
 };

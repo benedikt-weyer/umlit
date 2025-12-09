@@ -2,11 +2,11 @@ import React from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrthographicCamera, MapControls } from '@react-three/drei';
 import { useStore } from '../store';
-import { DiagramNodeComponent } from './3d/DiagramNodeComponent';
-import { DiagramEdgeComponent } from './3d/DiagramEdgeComponent';
-import { useTheme } from './ThemeContextProviderComponent';
+import { DiagramNode } from './3d/DiagramNode';
+import { DiagramEdge } from './3d/DiagramEdge';
+import { useTheme } from './ThemeContextProvider';
 
-export const DiagramVisualizerComponent: React.FC = () => {
+export const DiagramVisualizer: React.FC = () => {
   const diagram = useStore((state) => state.diagram);
   const { theme } = useTheme();
 
@@ -21,10 +21,10 @@ export const DiagramVisualizerComponent: React.FC = () => {
         
         <group>
           {diagram.edges.map((edge) => (
-            <DiagramEdgeComponent key={edge.id} {...edge} />
+            <DiagramEdge key={edge.id} {...edge} />
           ))}
           {diagram.nodes.map((node) => (
-            <DiagramNodeComponent key={node.id} {...node} />
+            <DiagramNode key={node.id} {...node} />
           ))}
         </group>
         

@@ -2,9 +2,9 @@ import React from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { useStore } from '../store';
-import { useTheme } from './ThemeContextProviderComponent';
+import { useTheme } from './ThemeContextProvider';
 
-export const SourceCodeEditorComponent: React.FC = () => {
+export const SourceCodeEditor: React.FC = () => {
   const { code, setCode } = useStore();
   const { theme } = useTheme();
 

@@ -2,18 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import { Text, Plane } from '@react-three/drei';
 import { useStore } from '../../store';
-import { useTheme } from '../ThemeContextProviderComponent';
+import { useTheme } from '../ThemeContextProvider';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
-interface DiagramNodeComponentProps {
+interface DiagramNodeProps {
   id: string;
   label: string;
   x: number;
   y: number;
 }
 
-export const DiagramNodeComponent: React.FC<DiagramNodeComponentProps> = ({ id, label, x, y }) => {
+export const DiagramNode: React.FC<DiagramNodeProps> = ({ id, label, x, y }) => {
   const updateNodePosition = useStore((state) => state.updateNodePosition);
   const { theme } = useTheme();
   const { gl, camera } = useThree();

@@ -1,9 +1,9 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Moon, Sun } from 'lucide-react';
-import { useTheme } from './ThemeContextProviderComponent';
+import { useTheme } from './ThemeContextProvider';
 
-export const ApplicationToolbarComponent: React.FC = () => {
+export const ApplicationToolbar: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   
   const handleExportPng = () => {

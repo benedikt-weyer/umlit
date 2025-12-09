@@ -1,10 +1,75 @@
-import React from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrthographicCamera, MapControls } from '@react-three/drei';
+import React, { useState, useRef } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import type { ThreeEvent } from '@react-three/fiber';
+import { OrthographicCamera } from '@react-three/drei';
 import { useStore } from '../store';
 import { DiagramNode } from './DiagramNode';
 import { DiagramEdge } from './DiagramEdge';
 import { useTheme } from './ThemeContextProvider';
+import * as THREE from 'three';
+
+// Background plane component for camera panning
+const BackgroundPlane: React.FC = () => {
+  const { camera, gl } = useThree();
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const cameraStartRef = useRef({ x: 0, y: 0 });
+  const orthoCamera = camera as THREE.OrthographicCamera;
+
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    setIsDragging(true);
+    const rect = gl.domElement.getBoundingClientRect();
+    dragStartRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+    cameraStartRef.current = {
+      x: orthoCamera.position.x,
+      y: orthoCamera.position.y,
+    };
+  };
+
+  React.useEffect(() => {
+    if (!isDragging) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      const deltaX = (e.clientX - rect.left - dragStartRef.current.x);
+      const deltaY = (e.clientY - rect.top - dragStartRef.current.y);
+      
+      // Convert screen delta to world delta based on camera zoom
+      const worldDeltaX = (deltaX / rect.width) * (orthoCamera.right - orthoCamera.left) / orthoCamera.zoom;
+      const worldDeltaY = -(deltaY / rect.height) * (orthoCamera.top - orthoCamera.bottom) / orthoCamera.zoom;
+      
+      orthoCamera.position.x = cameraStartRef.current.x - worldDeltaX;
+      orthoCamera.position.y = cameraStartRef.current.y - worldDeltaY;
+      orthoCamera.updateProjectionMatrix();
+    };
+
+    const handlePointerUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isDragging, orthoCamera, gl]);
+
+  return (
+    <mesh 
+      position={[0, 0, -100]} 
+      onPointerDown={handlePointerDown}
+    >
+      <planeGeometry args={[100000, 100000]} />
+      <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} />
+    </mesh>
+  );
+};
 
 export const DiagramVisualizer: React.FC = () => {
   const diagram = useStore((state) => state.diagram);
@@ -15,9 +80,10 @@ export const DiagramVisualizer: React.FC = () => {
       <Canvas>
         <color attach="background" args={[theme === 'dark' ? '#0a0a0a' : '#fafafa']} />
         <OrthographicCamera makeDefault position={[0, 0, 1000]} zoom={1} near={0.1} far={2000} />
-        <MapControls enableRotate={false} enablePan={false} />
         
         <ambientLight intensity={1} />
+        
+        <BackgroundPlane />
         
         <group>
           {diagram.edges.map((edge) => (
@@ -41,7 +107,6 @@ export const DiagramVisualizer: React.FC = () => {
 };
 
 // Helper component to access Three.js context
-import { useThree } from '@react-three/fiber';
 import { generateSVG, downloadStringAsFile } from '../utils/export';
 
 const ExportHandler = () => {

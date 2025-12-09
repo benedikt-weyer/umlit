@@ -18,8 +18,53 @@ export const DiagramEdge: React.FC<EdgeType> = ({ source, target, type }) => {
   const symbolColor = theme === 'dark' ? '#888888' : '#666666';
   const bgColor = theme === 'dark' ? '#0a0a0a' : '#fafafa';
 
-  const startPoint: [number, number, number] = [fromNode.x, -fromNode.y, 1];
-  const endPoint: [number, number, number] = [toNode.x, -toNode.y, 1];
+  // Node dimensions (from DiagramNode component)
+  const nodeWidth = 150;
+  const nodeHeight = 80;
+
+  // Calculate border intersection points
+  const calculateBorderPoint = (fromX: number, fromY: number, toX: number, toY: number): [number, number] => {
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    
+    if (dx === 0 && dy === 0) return [fromX, fromY];
+    
+    // Calculate intersection with rectangle borders
+    const halfWidth = nodeWidth / 2;
+    const halfHeight = nodeHeight / 2;
+    
+    // Calculate the angle from center to target
+    const absAngle = Math.abs(Math.atan2(dy, dx));
+    const rectAngle = Math.atan2(halfHeight, halfWidth);
+    
+    let borderX: number, borderY: number;
+    
+    // Determine which edge of the rectangle to intersect
+    if (absAngle < rectAngle) {
+      // Right edge
+      borderX = fromX + (dx > 0 ? halfWidth : -halfWidth);
+      borderY = fromY + (dy / dx) * (dx > 0 ? halfWidth : -halfWidth);
+    } else if (absAngle > Math.PI - rectAngle) {
+      // Left edge
+      borderX = fromX + (dx > 0 ? halfWidth : -halfWidth);
+      borderY = fromY + (dy / dx) * (dx > 0 ? halfWidth : -halfWidth);
+    } else {
+      // Top or bottom edge
+      borderY = fromY + (dy > 0 ? halfHeight : -halfHeight);
+      borderX = fromX + (dx / dy) * (dy > 0 ? halfHeight : -halfHeight);
+    }
+    
+    return [borderX, borderY];
+  };
+
+  const fromCenter: [number, number] = [fromNode.x, -fromNode.y];
+  const toCenter: [number, number] = [toNode.x, -toNode.y];
+  
+  const [startX, startY] = calculateBorderPoint(fromCenter[0], fromCenter[1], toCenter[0], toCenter[1]);
+  const [endX, endY] = calculateBorderPoint(toCenter[0], toCenter[1], fromCenter[0], fromCenter[1]);
+  
+  const startPoint: [number, number, number] = [startX, startY, 1];
+  const endPoint: [number, number, number] = [endX, endY, 1];
 
   const symbolRadius = 8;
   const symbolGap = 10; // Gap between symbols

@@ -5,6 +5,54 @@ import { useStore } from '../../store';
 import { useTheme } from '../ThemeContextProvider';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import type { Node as NodeType } from '../../types';
+
+// Helper function to recursively calculate node width
+function getNodeWidth(nodeId: string, allNodes: NodeType[]): number {
+  const node = allNodes.find(n => n.id === nodeId);
+  if (!node) return 150;
+  
+  const hasChildren = node.children && node.children.length > 0;
+  if (!hasChildren) return 150;
+  
+  const childNodes = allNodes.filter(n => n.parentId === nodeId);
+  if (childNodes.length === 0) return 150;
+  
+  const padding = 20;
+  let minX = Infinity, maxX = -Infinity;
+  
+  childNodes.forEach(child => {
+    const childWidth = getNodeWidth(child.id, allNodes);
+    minX = Math.min(minX, child.x - childWidth / 2);
+    maxX = Math.max(maxX, child.x + childWidth / 2);
+  });
+  
+  return Math.max(200, (maxX - minX) + padding * 2);
+}
+
+// Helper function to recursively calculate node height
+function getNodeHeight(nodeId: string, allNodes: NodeType[]): number {
+  const node = allNodes.find(n => n.id === nodeId);
+  if (!node) return 80;
+  
+  const hasChildren = node.children && node.children.length > 0;
+  if (!hasChildren) return 80;
+  
+  const childNodes = allNodes.filter(n => n.parentId === nodeId);
+  if (childNodes.length === 0) return 80;
+  
+  const padding = 20;
+  const labelSpace = 30;
+  let minY = Infinity, maxY = -Infinity;
+  
+  childNodes.forEach(child => {
+    const childHeight = getNodeHeight(child.id, allNodes);
+    minY = Math.min(minY, child.y - childHeight / 2);
+    maxY = Math.max(maxY, child.y + childHeight / 2);
+  });
+  
+  return Math.max(120, (maxY - minY) + padding * 2 + labelSpace);
+}
 
 interface NodeProps {
   id: string;
@@ -16,23 +64,57 @@ interface NodeProps {
   children?: string[];
 }
 
-export const Node: React.FC<NodeProps> = ({ id, label, x, y, depth = 0, children = [] }) => {
+export const Node: React.FC<NodeProps> = ({ id, label, x, y, parentId, depth = 0, children = [] }) => {
   const updateNodePosition = useStore((state) => state.updateNodePosition);
   const diagram = useStore((state) => state.diagram);
   const { theme } = useTheme();
   const { gl, camera } = useThree();
   const [isDragging, setIsDragging] = useState(false);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const oldPositionRef = useRef({ x, y });
 
   const bgColor = theme === 'dark' ? '#1f1f1f' : '#ffffff';
   const borderColor = theme === 'dark' ? '#666666' : '#cccccc';
   const textColor = theme === 'dark' ? '#ffffff' : '#000000';
   const portColor = theme === 'dark' ? '#4a9eff' : '#0066cc';
 
-  // Calculate size based on whether it has children
+  // Get child nodes if this is a container
   const hasChildren = children && children.length > 0;
-  const nodeWidth = hasChildren ? 300 : 150;
-  const nodeHeight = hasChildren ? 200 : 80;
+  const childNodes = hasChildren ? diagram.nodes.filter(n => n.parentId === id) : [];
+  
+  // Calculate dynamic size based on children positions
+  let nodeWidth = 150;
+  let nodeHeight = 80;
+  
+  if (hasChildren && childNodes.length > 0) {
+    const padding = 20; // Padding around children
+    const labelSpace = 30; // Space for the label at the top
+    
+    // Calculate bounds of all children
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    
+    childNodes.forEach(child => {
+      const childHasChildren = child.children && child.children.length > 0;
+      const childWidth = childHasChildren ? getNodeWidth(child.id, diagram.nodes) : 150;
+      const childHeight = childHasChildren ? getNodeHeight(child.id, diagram.nodes) : 80;
+      
+      minX = Math.min(minX, child.x - childWidth / 2);
+      maxX = Math.max(maxX, child.x + childWidth / 2);
+      minY = Math.min(minY, child.y - childHeight / 2);
+      maxY = Math.max(maxY, child.y + childHeight / 2);
+    });
+    
+    // Calculate container size with padding
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    nodeWidth = Math.max(200, contentWidth + padding * 2);
+    nodeHeight = Math.max(120, contentHeight + padding * 2 + labelSpace);
+  }
+
+  // Get parent node if exists
+  const parentNode = parentId ? diagram.nodes.find(n => n.id === parentId) : null;
 
   const position: [number, number, number] = [x, -y, depth * 0.1];
 
@@ -43,6 +125,7 @@ export const Node: React.FC<NodeProps> = ({ id, label, x, y, depth = 0, children
       x: e.point.x - x,
       y: -e.point.y - y
     };
+    oldPositionRef.current = { x, y };
     setIsDragging(true);
   };
 
@@ -57,10 +140,42 @@ export const Node: React.FC<NodeProps> = ({ id, label, x, y, depth = 0, children
       const vector = new THREE.Vector3(mouseX, mouseY, 0.5);
       vector.unproject(camera);
 
-      const newX = Math.round(vector.x - dragOffsetRef.current.x);
-      const newY = Math.round(-vector.y - dragOffsetRef.current.y);
+      let newX = Math.round(vector.x - dragOffsetRef.current.x);
+      let newY = Math.round(-vector.y - dragOffsetRef.current.y);
       
+      // If this node has a parent, constrain movement within parent bounds
+      if (parentNode) {
+        const parentWidth = getNodeWidth(parentNode.id, diagram.nodes);
+        const parentHeight = getNodeHeight(parentNode.id, diagram.nodes);
+        
+        const padding = 10;
+        const labelSpace = 30;
+        
+        const minX = parentNode.x - parentWidth / 2 + nodeWidth / 2 + padding;
+        const maxX = parentNode.x + parentWidth / 2 - nodeWidth / 2 - padding;
+        const minY = parentNode.y - parentHeight / 2 + nodeHeight / 2 + labelSpace;
+        const maxY = parentNode.y + parentHeight / 2 - nodeHeight / 2 - padding;
+        
+        newX = Math.max(minX, Math.min(maxX, newX));
+        newY = Math.max(minY, Math.min(maxY, newY));
+      }
+      
+      // Calculate delta for moving children
+      const deltaX = newX - oldPositionRef.current.x;
+      const deltaY = newY - oldPositionRef.current.y;
+      
+      // Update this node's position
       updateNodePosition(id, newX, newY);
+      
+      // Move all children by the same delta
+      if (hasChildren) {
+        const childNodesList = diagram.nodes.filter(n => n.parentId === id);
+        childNodesList.forEach(child => {
+          updateNodePosition(child.id, child.x + deltaX, child.y + deltaY);
+        });
+      }
+      
+      oldPositionRef.current = { x: newX, y: newY };
     };
 
     const handlePointerUp = () => {
@@ -74,13 +189,10 @@ export const Node: React.FC<NodeProps> = ({ id, label, x, y, depth = 0, children
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [isDragging, id, updateNodePosition, gl, camera]);
+  }, [isDragging, id, updateNodePosition, gl, camera, parentNode, hasChildren, diagram.nodes, nodeWidth, nodeHeight]);
 
   // Get ports for this node
   const nodePorts = diagram.ports.filter(p => p.nodeId === id);
-  
-  // Get child nodes if this is a container
-  const childNodes = hasChildren ? diagram.nodes.filter(n => n.parentId === id) : [];
 
   return (
     <group position={position}>
@@ -89,7 +201,12 @@ export const Node: React.FC<NodeProps> = ({ id, label, x, y, depth = 0, children
         args={[nodeWidth, nodeHeight]}
         onPointerDown={handlePointerDown}
       >
-        <meshBasicMaterial color={bgColor} />
+        {/* Transparent interior for containers, solid for leaf nodes */}
+        <meshBasicMaterial 
+          color={bgColor} 
+          transparent={hasChildren}
+          opacity={hasChildren ? 0 : 1}
+        />
         <lineSegments>
             <edgesGeometry args={[new THREE.PlaneGeometry(nodeWidth, nodeHeight)]} />
             <lineBasicMaterial color={borderColor} />

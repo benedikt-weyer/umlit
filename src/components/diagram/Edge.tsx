@@ -19,38 +19,88 @@ export const Edge: React.FC<EdgeType> = ({ source, target, type, isDelegate, ste
   const bgColor = theme === 'dark' ? '#0a0a0a' : '#fafafa';
   const textColor = theme === 'dark' ? '#ffffff' : '#000000';
 
-  // Node dimensions (from Node component)
-  const nodeWidth = 150;
-  const nodeHeight = 80;
+  // Helper to get node dimensions
+  const getNodeDimensions = (node: typeof fromNode): { width: number; height: number } => {
+    const hasChildren = node.children && node.children.length > 0;
+    if (!hasChildren) return { width: 150, height: 80 };
+    
+    // Calculate dynamic size for containers
+    const childNodes = diagram.nodes.filter(n => n.parentId === node.id);
+    if (childNodes.length === 0) return { width: 150, height: 80 };
+    
+    const padding = 20;
+    const labelSpace = 30;
+    
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    
+    childNodes.forEach(child => {
+      const childDims = getNodeDimensions(child);
+      minX = Math.min(minX, child.x - childDims.width / 2);
+      maxX = Math.max(maxX, child.x + childDims.width / 2);
+      minY = Math.min(minY, child.y - childDims.height / 2);
+      maxY = Math.max(maxY, child.y + childDims.height / 2);
+    });
+    
+    const width = Math.max(200, (maxX - minX) + padding * 2);
+    const height = Math.max(120, (maxY - minY) + padding * 2 + labelSpace);
+    
+    return { width, height };
+  };
 
-  // Calculate border intersection points
-  const calculateBorderPoint = (fromX: number, fromY: number, toX: number, toY: number): [number, number] => {
+  // Helper to calculate port position
+  const getPortPosition = (portId: string, node: typeof fromNode): [number, number] => {
+    const port = diagram.ports.find(p => p.id === portId);
+    if (!port) return [node.x, node.y];
+    
+    const dims = getNodeDimensions(node);
+    let portX = node.x;
+    let portY = node.y;
+    
+    switch (port.side) {
+      case 'left':
+        portX = node.x - dims.width / 2;
+        break;
+      case 'right':
+        portX = node.x + dims.width / 2;
+        break;
+      case 'top':
+        portY = node.y - dims.height / 2;
+        break;
+      case 'bottom':
+        portY = node.y + dims.height / 2;
+        break;
+    }
+    
+    return [portX, portY];
+  };
+
+  // Calculate border intersection points (when no port is specified)
+  const calculateBorderPoint = (node: typeof fromNode, toX: number, toY: number): [number, number] => {
+    const dims = getNodeDimensions(node);
+    const fromX = node.x;
+    const fromY = node.y;
+    
     const dx = toX - fromX;
     const dy = toY - fromY;
     
     if (dx === 0 && dy === 0) return [fromX, fromY];
     
-    // Calculate intersection with rectangle borders
-    const halfWidth = nodeWidth / 2;
-    const halfHeight = nodeHeight / 2;
+    const halfWidth = dims.width / 2;
+    const halfHeight = dims.height / 2;
     
-    // Calculate the angle from center to target
     const absAngle = Math.abs(Math.atan2(dy, dx));
     const rectAngle = Math.atan2(halfHeight, halfWidth);
     
     let borderX: number, borderY: number;
     
-    // Determine which edge of the rectangle to intersect
     if (absAngle < rectAngle) {
-      // Right edge
       borderX = fromX + (dx > 0 ? halfWidth : -halfWidth);
       borderY = fromY + (dy / dx) * (dx > 0 ? halfWidth : -halfWidth);
     } else if (absAngle > Math.PI - rectAngle) {
-      // Left edge
       borderX = fromX + (dx > 0 ? halfWidth : -halfWidth);
       borderY = fromY + (dy / dx) * (dx > 0 ? halfWidth : -halfWidth);
     } else {
-      // Top or bottom edge
       borderY = fromY + (dy > 0 ? halfHeight : -halfHeight);
       borderX = fromX + (dx / dy) * (dy > 0 ? halfHeight : -halfHeight);
     }
@@ -58,14 +108,30 @@ export const Edge: React.FC<EdgeType> = ({ source, target, type, isDelegate, ste
     return [borderX, borderY];
   };
 
-  const fromCenter: [number, number] = [fromNode.x, -fromNode.y];
-  const toCenter: [number, number] = [toNode.x, -toNode.y];
+  // Determine start and end points
+  let startX: number, startY: number;
+  let endX: number, endY: number;
   
-  const [startX, startY] = calculateBorderPoint(fromCenter[0], fromCenter[1], toCenter[0], toCenter[1]);
-  const [endX, endY] = calculateBorderPoint(toCenter[0], toCenter[1], fromCenter[0], fromCenter[1]);
+  if (sourcePort) {
+    // Use port position
+    [startX, startY] = getPortPosition(sourcePort, fromNode);
+  } else {
+    // Use border intersection
+    const targetPos = targetPort ? getPortPosition(targetPort, toNode) : [toNode.x, toNode.y];
+    [startX, startY] = calculateBorderPoint(fromNode, targetPos[0], targetPos[1]);
+  }
   
-  const startPoint: [number, number, number] = [startX, startY, 1];
-  const endPoint: [number, number, number] = [endX, endY, 1];
+  if (targetPort) {
+    // Use port position
+    [endX, endY] = getPortPosition(targetPort, toNode);
+  } else {
+    // Use border intersection
+    const sourcePos = sourcePort ? getPortPosition(sourcePort, fromNode) : [fromNode.x, fromNode.y];
+    [endX, endY] = calculateBorderPoint(toNode, sourcePos[0], sourcePos[1]);
+  }
+  
+  const startPoint: [number, number, number] = [startX, -startY, 1];
+  const endPoint: [number, number, number] = [endX, -endY, 1];
 
   const ballRadius = 12; // Full circle (ball)
   const socketRadius = 16; // Half circle (socket) - bigger than ball

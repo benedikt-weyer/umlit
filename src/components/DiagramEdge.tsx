@@ -1,6 +1,6 @@
 import React from 'react';
 import { Line } from '@react-three/drei';
-import type { Edge as EdgeType } from '../../types';
+import type { Edge as EdgeType } from '../types';
 import { useStore } from '../store';
 import { useTheme } from './ThemeContextProvider';
 import * as THREE from 'three';
@@ -125,11 +125,11 @@ export const DiagramEdge: React.FC<EdgeType> = ({ source, target, type }) => {
   const leftSymbolPos: [number, number, number] = [leftSymbolX, leftSymbolY, 1];
   const rightSymbolPos: [number, number, number] = [rightSymbolX, rightSymbolY, 1];
 
-  // Calculate line break points (outside the symbols)
-  const lineBreakLeftX = centerX - (dx / length) * (symbolRadius * 2 + symbolGap);
-  const lineBreakLeftY = centerY - (dy / length) * (symbolRadius * 2 + symbolGap);
-  const lineBreakRightX = centerX + (dx / length) * (symbolRadius * 2 + symbolGap);
-  const lineBreakRightY = centerY + (dy / length) * (symbolRadius * 2 + symbolGap);
+  // Calculate line break points (at the edge of the symbols, touching them)
+  const lineBreakLeftX = centerX - (dx / length) * (symbolRadius * 2 + symbolGap / 2);
+  const lineBreakLeftY = centerY - (dy / length) * (symbolRadius * 2 + symbolGap / 2);
+  const lineBreakRightX = centerX + (dx / length) * (symbolRadius * 2 + symbolGap / 2);
+  const lineBreakRightY = centerY + (dy / length) * (symbolRadius * 2 + symbolGap / 2);
 
   const renderSymbol = (pos: [number, number, number], symbolType: 'full' | 'left' | 'right', isLeftSide: boolean) => {
     if (symbolType === 'full') {

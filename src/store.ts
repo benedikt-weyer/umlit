@@ -9,19 +9,20 @@ interface AppState {
   updateNodePosition: (id: string, x: number, y: number) => void;
 }
 
-const DEFAULT_CODE = `[NodeA] User @ 0,0
-[NodeB] Service @ 200,0 {
-  [NodeB1] Handler @ 220,20
-  [NodeB2] Logic @ 220,80
-  port [p1] on [NodeB] left : API
-  NodeB1 -> NodeB2
-}
-[NodeC] Database @ 200,200
+const DEFAULT_CODE = `[uml2.5-component] {
+  [NodeA] User @ 0,0
+  [NodeB] Service @ 200,0 {
+    [NodeB1] Handler @ 220,20
+    [NodeB2] Logic @ 220,80
+    port [p1] on [NodeB] left : API
+    NodeB1 -> NodeB2
+  }
+  [NodeC] Database @ 200,200
 
-NodeA -())- NodeB
-NodeB.p1 ->delegate-> NodeB1
-NodeB -(()- NodeC
-`.trim();
+  NodeA -())- NodeB
+  NodeB.p1 ->delegate-> NodeB1
+  NodeB -(()- NodeC
+}`.trim();
 
 export const useStore = create<AppState>((set) => ({
   code: DEFAULT_CODE,
@@ -92,7 +93,7 @@ export const useStore = create<AppState>((set) => ({
 
       return {
         code: newCode,
-        diagram: { ...state.diagram, nodes: newNodes },
+        diagram: { ...state.diagram, nodes: newNodes, type: state.diagram.type },
       };
     }),
 }));

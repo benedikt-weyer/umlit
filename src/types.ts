@@ -1,3 +1,9 @@
+export type DiagramType = 
+  | 'uml2.5-component'
+  | 'uml2.5-class'
+  | 'uml2.5-sequence'
+  | 'uml2.5-activity';
+
 export interface Port {
   id: string;
   nodeId: string; // The node this port belongs to
@@ -33,6 +39,7 @@ export interface Edge {
 }
 
 export interface Diagram {
+  type: DiagramType;
   nodes: Node[];
   edges: Edge[];
   ports: Port[];

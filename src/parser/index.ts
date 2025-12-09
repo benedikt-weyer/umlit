@@ -1,8 +1,47 @@
-import type { Diagram, Node, Edge, Port } from '../types';
+import type { Diagram, Node, Edge, Port, DiagramType } from '../types';
 
 const MAX_DEPTH = 50;
 
 export function parseDiagram(code: string): Diagram {
+  const trimmedCode = code.trim();
+  
+  // Detect diagram type from wrapper: [diagram-type] { ... }
+  const diagramTypeMatch = trimmedCode.match(/^\[([^\]]+)\]\s*\{([\s\S]*)\}$/);
+  
+  let diagramType: DiagramType = 'uml2.5-component'; // Default
+  let content = trimmedCode;
+  
+  if (diagramTypeMatch) {
+    const typeString = diagramTypeMatch[1];
+    content = diagramTypeMatch[2];
+    
+    // Validate and set diagram type
+    if (typeString === 'uml2.5-component' || 
+        typeString === 'uml2.5-class' || 
+        typeString === 'uml2.5-sequence' || 
+        typeString === 'uml2.5-activity') {
+      diagramType = typeString as DiagramType;
+    } else {
+      console.warn(`Unknown diagram type: ${typeString}, defaulting to uml2.5-component`);
+    }
+  }
+  
+  // Parse based on diagram type
+  switch (diagramType) {
+    case 'uml2.5-component':
+      return parseComponentDiagram(content, diagramType);
+    case 'uml2.5-class':
+    case 'uml2.5-sequence':
+    case 'uml2.5-activity':
+      // TODO: Implement other diagram parsers
+      console.warn(`${diagramType} not yet implemented, using component diagram parser`);
+      return parseComponentDiagram(content, diagramType);
+    default:
+      return parseComponentDiagram(content, diagramType);
+  }
+}
+
+function parseComponentDiagram(code: string, diagramType: DiagramType): Diagram {
   const lines = code.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -175,5 +214,5 @@ export function parseDiagram(code: string): Diagram {
     }
   }
 
-  return { nodes, edges, ports };
+  return { type: diagramType, nodes, edges, ports };
 }

@@ -2,9 +2,11 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Moon, Sun } from 'lucide-react';
 import { useTheme } from './ThemeContextProvider';
+import { useStore } from '../store';
 
 export const ApplicationToolbar: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
+  const diagramType = useStore((state) => state.diagram.type);
   
   const handleExportPng = () => {
     window.dispatchEvent(new CustomEvent('export-png'));
@@ -19,6 +21,9 @@ export const ApplicationToolbar: React.FC = () => {
       <div className="flex items-center gap-2">
         <h1 className="text-xl font-bold">UMLit</h1>
         <span className="text-sm text-muted-foreground">Text-to-Visual Diagram Editor</span>
+        <span className="text-xs px-2 py-1 rounded bg-primary/10 text-primary font-mono">
+          {diagramType}
+        </span>
       </div>
       <div className="flex items-center gap-2">
         <Button onClick={toggleTheme} variant="ghost" size="default">

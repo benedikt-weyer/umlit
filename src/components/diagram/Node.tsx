@@ -71,7 +71,6 @@ export const Node: React.FC<NodeProps> = ({ id, label, x, y, parentId, depth = 0
   const { gl, camera } = useThree();
   const [isDragging, setIsDragging] = useState(false);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
-  const oldPositionRef = useRef({ x, y });
 
   const bgColor = theme === 'dark' ? '#1f1f1f' : '#ffffff';
   const borderColor = theme === 'dark' ? '#666666' : '#cccccc';
@@ -125,7 +124,6 @@ export const Node: React.FC<NodeProps> = ({ id, label, x, y, parentId, depth = 0
       x: e.point.x - x,
       y: -e.point.y - y
     };
-    oldPositionRef.current = { x, y };
     setIsDragging(true);
   };
 
@@ -160,22 +158,9 @@ export const Node: React.FC<NodeProps> = ({ id, label, x, y, parentId, depth = 0
         newY = Math.max(minY, Math.min(maxY, newY));
       }
       
-      // Calculate delta for moving children
-      const deltaX = newX - oldPositionRef.current.x;
-      const deltaY = newY - oldPositionRef.current.y;
-      
       // Update this node's position
+      // Children don't need their positions updated - they follow through the transform hierarchy
       updateNodePosition(id, newX, newY);
-      
-      // Move all children by the same delta
-      if (hasChildren) {
-        const childNodesList = diagram.nodes.filter(n => n.parentId === id);
-        childNodesList.forEach(child => {
-          updateNodePosition(child.id, child.x + deltaX, child.y + deltaY);
-        });
-      }
-      
-      oldPositionRef.current = { x: newX, y: newY };
     };
 
     const handlePointerUp = () => {

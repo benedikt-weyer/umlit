@@ -1,11 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { OrthographicCamera } from '@react-three/drei';
 import { useStore } from '../../store';
-import { Node } from './Node';
+import { Renderer } from './Renderer';
 import { Edge } from './Edge';
 import { useTheme } from '../ThemeContextProvider';
+import { buildRenderStack } from '../../utils/renderStack';
 import * as THREE from 'three';
 
 // Background plane component for camera panning and zooming
@@ -99,7 +100,17 @@ const BackgroundPlane: React.FC = () => {
 
 export const Visualizer: React.FC = () => {
   const diagram = useStore((state) => state.diagram);
+  const updateNodePosition = useStore((state) => state.updateNodePosition);
   const { theme } = useTheme();
+
+  // Build render stack from diagram
+  const renderStack = useMemo(() => {
+    return buildRenderStack(diagram, theme);
+  }, [diagram, theme]);
+
+  const handleNodeDrag = (nodeId: string, x: number, y: number) => {
+    updateNodePosition(nodeId, x, y);
+  };
 
   return (
     <div className="h-full w-full bg-background relative">
@@ -112,22 +123,13 @@ export const Visualizer: React.FC = () => {
         <BackgroundPlane />
         
         <group>
+          {/* Render edges */}
           {diagram.edges.map((edge) => (
             <Edge key={edge.id} {...edge} />
           ))}
-          {/* Only render root nodes (depth 0), children will be rendered recursively */}
-          {diagram.nodes.filter(node => !node.parentId).map((node) => (
-            <Node 
-              key={node.id} 
-              id={node.id}
-              label={node.label}
-              x={node.x}
-              y={node.y}
-              parentId={node.parentId}
-              depth={node.depth}
-              children={node.children}
-            />
-          ))}
+          
+          {/* Render everything from the stack */}
+          <Renderer renderStack={renderStack} onNodeDrag={handleNodeDrag} />
         </group>
         
         {/* Grid helper for reference */}

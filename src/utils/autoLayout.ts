@@ -83,19 +83,14 @@ function layoutChildrenInParent(parentId: string, parentX: number, parentY: numb
   let newNodes = [...nodes];
   const childSpacing = 30;
   
-  // Position children in a simple vertical stack
+  // Just position children in a simple stack - parent will size around them
   let currentY = parentY;
   
   children.forEach((child, index) => {
     const childBounds = getNodeBounds(newNodes.find(n => n.id === child.id) || child, newNodes);
     
-    // First child starts at currentY
-    if (index === 0) {
-      currentY = parentY + childBounds.height / 2;
-    }
-    
     const childX = parentX;
-    const childY = currentY;
+    const childY = currentY + (index === 0 ? childBounds.height / 2 : 0);
     
     // Update child position
     const childIndex = newNodes.findIndex(n => n.id === child.id);
@@ -127,7 +122,7 @@ function layoutChildrenInParent(parentId: string, parentX: number, parentY: numb
     }
     
     // Move to next position
-    currentY += childBounds.height / 2 + childSpacing + (index < children.length - 1 ? getNodeBounds(newNodes.find(n => n.id === children[index + 1].id) || children[index + 1], newNodes).height / 2 : 0);
+    currentY = childY + childBounds.height / 2 + childSpacing;
   });
   
   return newNodes;

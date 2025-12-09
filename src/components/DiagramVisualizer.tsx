@@ -8,7 +8,7 @@ import { DiagramEdge } from './DiagramEdge';
 import { useTheme } from './ThemeContextProvider';
 import * as THREE from 'three';
 
-// Background plane component for camera panning
+// Background plane component for camera panning and zooming
 const BackgroundPlane: React.FC = () => {
   const { camera, gl } = useThree();
   const [isDragging, setIsDragging] = useState(false);
@@ -59,6 +59,32 @@ const BackgroundPlane: React.FC = () => {
       window.removeEventListener('pointerup', handlePointerUp);
     };
   }, [isDragging, orthoCamera, gl]);
+
+  // Mouse wheel zoom handler
+  React.useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      
+      // Zoom factor: smaller value = slower zoom
+      const zoomSpeed = 0.001;
+      const delta = -e.deltaY * zoomSpeed;
+      
+      // Calculate new zoom with limits
+      const minZoom = 0.1;
+      const maxZoom = 5;
+      const newZoom = Math.max(minZoom, Math.min(maxZoom, orthoCamera.zoom * (1 + delta)));
+      
+      orthoCamera.zoom = newZoom;
+      orthoCamera.updateProjectionMatrix();
+    };
+
+    const canvas = gl.domElement;
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('wheel', handleWheel);
+    };
+  }, [orthoCamera, gl]);
 
   return (
     <mesh 

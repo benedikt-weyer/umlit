@@ -33,30 +33,57 @@ export const useStore = create<AppState>((set) => ({
     }),
   updateNodePosition: (id, x, y) =>
     set((state) => {
-      // Update diagram state
-      const newNodes = state.diagram.nodes.map((node) =>
-        node.id === id ? { ...node, x, y } : node
-      );
+      const movedNode = state.diagram.nodes.find(n => n.id === id);
+      if (!movedNode) return state;
       
-      // Update code to reflect new position
-      // This is a naive implementation; a real one would need a smarter code updater (CST/AST)
-      // For now, we'll just regenerate the code or regex replace
-      // But regex replace is safer to preserve other parts
+      // Calculate delta
+      const deltaX = x - movedNode.x;
+      const deltaY = y - movedNode.y;
       
+      // Get all descendant nodes recursively
+      const getDescendants = (nodeId: string): string[] => {
+        const children = state.diagram.nodes.filter(n => n.parentId === nodeId);
+        const childIds = children.map(c => c.id);
+        const grandchildren = children.flatMap(c => getDescendants(c.id));
+        return [...childIds, ...grandchildren];
+      };
+      
+      const descendantIds = getDescendants(id);
+      const nodesToUpdate = [id, ...descendantIds];
+      
+      // Update all nodes (parent and all descendants)
+      const newNodes = state.diagram.nodes.map((node) => {
+        if (nodesToUpdate.includes(node.id)) {
+          const isMainNode = node.id === id;
+          return {
+            ...node,
+            x: isMainNode ? x : node.x + deltaX,
+            y: isMainNode ? y : node.y + deltaY
+          };
+        }
+        return node;
+      });
+      
+      // Update code for all moved nodes
       let newCode = state.code;
       const lines = newCode.split('\n');
       const newLines = lines.map(line => {
         const trimmed = line.trim();
-        // Check if line defines this node
-        // Regex: ^\[id\] ...
-        const nodeRegex = new RegExp(`^\\[${id}\\]`);
-        if (nodeRegex.test(trimmed)) {
-           // Check if it already has coordinates
-           if (trimmed.includes('@')) {
-             return trimmed.replace(/@\s*-?\d+,\s*-?\d+/, `@ ${x},${y}`);
-           } else {
-             return `${trimmed} @ ${x},${y}`;
-           }
+        
+        // Check each moved node
+        for (const nodeId of nodesToUpdate) {
+          const nodeRegex = new RegExp(`^\\[${nodeId}\\]`);
+          if (nodeRegex.test(trimmed)) {
+            const updatedNode = newNodes.find(n => n.id === nodeId);
+            if (updatedNode) {
+              // Check if it already has coordinates
+              if (trimmed.includes('@')) {
+                return trimmed.replace(/@\s*-?\d+,\s*-?\d+/, `@ ${updatedNode.x},${updatedNode.y}`);
+              } else {
+                return `${trimmed} @ ${updatedNode.x},${updatedNode.y}`;
+              }
+            }
+          }
         }
         return line;
       });

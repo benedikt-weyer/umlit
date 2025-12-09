@@ -47,10 +47,62 @@ function getNodeBounds(node: Node, allNodes: Node[]): { width: number; height: n
   return { width, height };
 }
 
+// Layout children within a parent container
+function layoutChildrenInParent(parentId: string, parentX: number, parentY: number, nodes: Node[]): Node[] {
+  const children = nodes.filter(n => n.parentId === parentId);
+  if (children.length === 0) return nodes;
+  
+  const newNodes = [...nodes];
+  const childSpacing = 40;
+  const padding = 30;
+  
+  // Simple vertical layout for children
+  let currentY = parentY - 50; // Start near top of parent (below label)
+  
+  children.forEach((child, index) => {
+    const childBounds = getNodeBounds(child, newNodes);
+    
+    // Position child
+    const childX = parentX;
+    const childY = currentY + childBounds.height / 2;
+    
+    const childIndex = newNodes.findIndex(n => n.id === child.id);
+    if (childIndex !== -1) {
+      newNodes[childIndex] = { ...newNodes[childIndex], x: childX, y: childY };
+      
+      // Recursively layout grandchildren
+      layoutChildrenInParent(child.id, childX, childY, newNodes);
+    }
+    
+    currentY += childBounds.height + childSpacing;
+  });
+  
+  return newNodes;
+}
+
 // Simple grid layout for root nodes
 export function autoLayoutNodes(nodes: Node[], config: Partial<LayoutConfig> = {}): Node[] {
   const cfg = { ...DEFAULT_CONFIG, ...config };
-  const newNodes = [...nodes];
+  let newNodes = [...nodes];
+  
+  // First, layout children within their parents (bottom-up)
+  const layoutAllChildren = (nodeList: Node[]): Node[] => {
+    let result = [...nodeList];
+    
+    // Get all nodes that have children
+    const parentsWithChildren = result.filter(n => {
+      const hasChildren = n.children && n.children.length > 0;
+      const actualChildren = result.filter(c => c.parentId === n.id);
+      return hasChildren || actualChildren.length > 0;
+    });
+    
+    // Layout children for each parent
+    parentsWithChildren.forEach(parent => {
+      result = layoutChildrenInParent(parent.id, parent.x || 0, parent.y || 0, result);
+    });
+    
+    return result;
+  };
   
   // Get root nodes (nodes without parents)
   const rootNodes = newNodes.filter(n => !n.parentId);
@@ -71,8 +123,8 @@ export function autoLayoutNodes(nodes: Node[], config: Partial<LayoutConfig> = {
     const newY = cfg.startY + row * (bounds.height + cfg.verticalSpacing);
     
     // Calculate delta for this root node
-    const deltaX = newX - rootNode.x;
-    const deltaY = newY - rootNode.y;
+    const deltaX = newX - (rootNode.x || 0);
+    const deltaY = newY - (rootNode.y || 0);
     
     // Update root node position
     const nodeIndex = newNodes.findIndex(n => n.id === rootNode.id);
@@ -80,24 +132,8 @@ export function autoLayoutNodes(nodes: Node[], config: Partial<LayoutConfig> = {
       newNodes[nodeIndex] = { ...newNodes[nodeIndex], x: newX, y: newY };
     }
     
-    // Update all children recursively
-    const updateChildren = (parentId: string, dx: number, dy: number) => {
-      const children = newNodes.filter(n => n.parentId === parentId);
-      children.forEach(child => {
-        const childIndex = newNodes.findIndex(n => n.id === child.id);
-        if (childIndex !== -1) {
-          newNodes[childIndex] = {
-            ...newNodes[childIndex],
-            x: newNodes[childIndex].x + dx,
-            y: newNodes[childIndex].y + dy
-          };
-          // Recursively update grandchildren
-          updateChildren(child.id, dx, dy);
-        }
-      });
-    };
-    
-    updateChildren(rootNode.id, deltaX, deltaY);
+    // Layout children relative to parent
+    newNodes = layoutChildrenInParent(rootNode.id, newX, newY, newNodes);
   });
   
   return newNodes;

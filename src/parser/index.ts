@@ -2,15 +2,23 @@ import type { Diagram, Node, Edge, Port } from '../types';
 import { parseToAST } from './astParser';
 import type { DiagramAST, ASTNode } from '../types/ast';
 
+import { Lexer, type Token } from './lexer';
+
 export type ParseResult = {
   diagram: Diagram;
+  ast?: DiagramAST;
+  tokens?: Token[];
   error?: Error | any;
 };
 
 export function parseDiagram(code: string): ParseResult {
   try {
     const ast = parseToAST(code);
-    return { diagram: convertASTToDiagram(ast) };
+    return { 
+      diagram: convertASTToDiagram(ast),
+      ast,
+      tokens: ast.tokens
+    };
   } catch (error) {
     console.error("Parsing error:", error);
     return {

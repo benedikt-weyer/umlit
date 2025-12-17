@@ -80,7 +80,7 @@ export function parseToAST(code: string): DiagramAST {
        if (match(TokenType.RBRACE)) {
          consume(TokenType.RBRACE);
        }
-       return { type: diagramType, rootNodes, edges };
+       return { type: diagramType, rootNodes, edges, tokens };
     }
   }
   
@@ -332,5 +332,5 @@ export function parseToAST(code: string): DiagramAST {
     }
   }
 
-  return { type: diagramType, rootNodes, edges };
+  return { type: diagramType, rootNodes, edges, tokens };
 }

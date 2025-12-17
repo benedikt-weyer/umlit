@@ -1,6 +1,8 @@
 // Abstract Syntax Tree - Tree representation of diagram objects
 // This is the intermediate representation between parsing and rendering
 
+import type { Token } from '../parser/lexer';
+
 export type DiagramType = 
   | 'uml2.5-component'
   | 'uml2.5-class'
@@ -41,5 +43,6 @@ export interface DiagramAST {
   type: DiagramType;
   rootNodes: ASTNode[]; // Top-level nodes only
   edges: ASTEdge[]; // All edges (flat list)
+  tokens?: Token[];
 }
-
+```

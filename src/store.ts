@@ -1,12 +1,16 @@
 import { create } from 'zustand';
 import { parseDiagram } from './parser';
-import type { Diagram } from './types';
+import type { Diagram, Node, Edge, Port } from './types';
+import type { DiagramAST } from './types/ast';
+import type { Token } from './parser/lexer';
 import { autoLayoutNodes, updateCodeWithPositions } from './utils/autoLayout';
 
 interface AppState {
   code: string;
   diagram: Diagram;
-  error: Error | null; // Store parser error
+  error: Error | null;
+  tokens: Token[] | null;
+  ast: DiagramAST | null;
   setCode: (code: string) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
   autoLayout: () => void;
@@ -29,20 +33,28 @@ const DEFAULT_CODE = `[uml2.5-component] {
 
 // Initialize with auto-layout applied
 const initializeDiagram = () => {
-  const { diagram: initialDiagram, error: initialError } = parseDiagram(DEFAULT_CODE);
+  const { diagram: initialDiagram, error: initialError, ast: initialAST, tokens: initialTokens } = parseDiagram(DEFAULT_CODE);
   
   if (initialError) {
-      return { code: DEFAULT_CODE, diagram: initialDiagram, error: initialError };
+      return { 
+        code: DEFAULT_CODE, 
+        diagram: initialDiagram, 
+        error: initialError,
+        ast: initialAST || null,
+        tokens: initialTokens || null
+      };
   }
   
   const layoutedNodes = autoLayoutNodes(initialDiagram.nodes);
   const layoutedCode = updateCodeWithPositions(DEFAULT_CODE, layoutedNodes);
-  const { diagram: layoutedDiagram, error: layoutError } = parseDiagram(layoutedCode);
+  const { diagram: layoutedDiagram, error: layoutError, ast: layoutAST, tokens: layoutTokens } = parseDiagram(layoutedCode);
   
   return {
     code: layoutedCode,
     diagram: layoutedDiagram,
-    error: layoutError || null
+    error: layoutError || null,
+    ast: layoutAST || null,
+    tokens: layoutTokens || null
   };
 };
 
@@ -52,10 +64,18 @@ export const useStore = create<AppState>((set) => ({
   code: initialState.code,
   diagram: initialState.diagram,
   error: initialState.error,
+  tokens: initialState.tokens,
+  ast: initialState.ast,
   setCode: (code) =>
     set(() => {
-      const { diagram, error } = parseDiagram(code);
-      return { code, diagram, error: error || null };
+      const { diagram, error, ast, tokens } = parseDiagram(code);
+      return { 
+        code, 
+        diagram, 
+        error: error || null,
+        ast: ast || null,
+        tokens: tokens || null
+      };
     }),
   updateNodePosition: (id, x, y) =>
     set((state) => {

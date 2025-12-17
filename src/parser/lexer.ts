@@ -10,6 +10,7 @@ export enum TokenType {
   DELEGATE_ARROW = 'DELEGATE_ARROW', // ->delegate->
   KEYWORD_PORT = 'PORT', // port
   KEYWORD_ON = 'ON',     // on
+  KEYWORD_WITH = 'WITH', // with
   SIDE = 'SIDE',         // left, right, top, bottom
   INTERFACE_CONNECTOR = 'INTERFACE', // -())-, -(()-, etc.
   IDENTIFIER = 'IDENTIFIER',
@@ -147,6 +148,7 @@ export class Lexer {
 
       if (value === 'port') return this.createToken(TokenType.KEYWORD_PORT, value);
       if (value === 'on') return this.createToken(TokenType.KEYWORD_ON, value);
+      if (value === 'with') return this.createToken(TokenType.KEYWORD_WITH, value);
       if (['left', 'right', 'top', 'bottom'].includes(value)) return this.createToken(TokenType.SIDE, value);
 
       return this.createToken(TokenType.IDENTIFIER, value);

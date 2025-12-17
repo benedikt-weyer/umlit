@@ -47,46 +47,47 @@ export interface BookIconRenderable extends BaseRenderable {
   strokeColor: string;
 }
 
+// Simple connector types that can be chained
 export type ConnectorRenderable = 
-  | SimpleConnectorRenderable 
-  | DelegateConnectorRenderable 
-  | InterfaceConnectorRenderable;
+  | LineConnectorRenderable 
+  | BallConnectorRenderable 
+  | SocketConnectorRenderable;
 
 export interface BaseConnectorRenderable extends BaseRenderable {
   type: 'connector';
-  points: [number, number][]; // Start and End points usually
   color: string;
   lineWidth: number;
+}
+
+// Simple line connector - can be solid or dashed, with optional arrow and label
+export interface LineConnectorRenderable extends BaseConnectorRenderable {
+  connectorType: 'line';
+  points: [number, number][]; // Start and End points
+  dashed?: boolean;
+  dashSize?: number;
+  arrowEnd?: boolean; // Arrow at end point
+  arrowStart?: boolean; // Arrow at start point
   label?: string;
   labelColor?: string;
 }
 
-export interface SimpleConnectorRenderable extends BaseConnectorRenderable {
-  connectorType: 'simple';
-  symbolStart?: 'arrow' | 'none'; // Standard arrows
-  symbolEnd?: 'arrow' | 'none';
+// Ball symbol connector (provider interface)
+export interface BallConnectorRenderable extends BaseConnectorRenderable {
+  connectorType: 'ball';
+  x: number;
+  y: number;
+  radius: number;
+  fillColor: string;
 }
 
-export interface DelegateConnectorRenderable extends BaseConnectorRenderable {
-  connectorType: 'delegate';
-  dashed: boolean;
-  dashSize?: number;
-  symbolEnd?: 'arrow';
-}
-
-export interface InterfaceConnectorRenderable extends BaseConnectorRenderable {
-  connectorType: 'interface';
-  // "Ball" is provider, "Socket" is requirer
-  providerSymbol?: 'ball';
-  requirerSymbol?: 'socket'; 
-  // We need to know which end has which.
-  // Actually, let's keep it abstract:
-  // e.g. "symbolStart" and "symbolEnd" but typed?
-  // Or better:
-  startSymbol?: 'ball' | 'socket-left' | 'socket-right'; 
-  endSymbol?: 'ball' | 'socket-left' | 'socket-right';
-  symbolColor?: string;
-  symbolBgColor?: string;
+// Socket symbol connector (requirer interface)
+export interface SocketConnectorRenderable extends BaseConnectorRenderable {
+  connectorType: 'socket';
+  x: number;
+  y: number;
+  radius: number;
+  angle: number; // Rotation angle for the socket opening
+  direction: 'left' | 'right'; // Which way the socket opens
 }
 
 export type Renderable = 

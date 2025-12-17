@@ -200,6 +200,11 @@ export function updateCodeWithPositions(code: string, nodes: Node[]): string {
   const newLines = lines.map(line => {
     const trimmed = line.trim();
     
+    // Skip connector/edge lines (they contain arrows or interface connectors)
+    if (trimmed.includes('->') || trimmed.includes('-()') || trimmed.includes('(()-')) {
+      return line;
+    }
+    
     // Check each node
     for (const node of nodes) {
       const nodeRegex = new RegExp(`^\\[${node.id}\\]`);

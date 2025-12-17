@@ -12,6 +12,7 @@ interface AppState {
   tokens: Token[] | null;
   ast: DiagramAST | null;
   setCode: (code: string) => void;
+  resetCode: () => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
   autoLayout: () => void;
 }
@@ -21,14 +22,13 @@ const DEFAULT_CODE = `[uml2.5-component] {
   [NodeB] Service {
     [NodeB1] Handler
     [NodeB2] Logic
-    port [p1] on [NodeB] left : API
-    NodeB1 -> NodeB2
+    port [p1] with [Connection1] left : API
+    port [p2] with [Connection2] right : API2
   }
   [NodeC] Database
 
-  NodeA -())- NodeB
-  NodeB.p1 ->delegate-> NodeB1
-  NodeB -(()- NodeC
+  [Connection1] NodeA -())- NodeB1
+  [Connection2] NodeC -(()- NodeB2
 }`.trim();
 
 // Initialize with auto-layout applied
@@ -142,6 +142,32 @@ export const useStore = create<AppState>((set) => ({
       return {
         code: newCode,
         diagram: { ...state.diagram, nodes: newNodes, type: state.diagram.type },
+      };
+    }),
+  resetCode: () =>
+    set(() => {
+      const { diagram, error, ast, tokens } = parseDiagram(DEFAULT_CODE);
+      
+      if (error) {
+        return {
+          code: DEFAULT_CODE,
+          diagram,
+          error: error || null,
+          ast: ast || null,
+          tokens: tokens || null
+        };
+      }
+      
+      const layoutedNodes = autoLayoutNodes(diagram.nodes);
+      const layoutedCode = updateCodeWithPositions(DEFAULT_CODE, layoutedNodes);
+      const { diagram: layoutedDiagram, error: layoutError, ast: layoutAST, tokens: layoutTokens } = parseDiagram(layoutedCode);
+      
+      return {
+        code: layoutedCode,
+        diagram: layoutedDiagram,
+        error: layoutError || null,
+        ast: layoutAST || null,
+        tokens: layoutTokens || null
       };
     }),
   autoLayout: () =>

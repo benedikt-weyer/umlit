@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, Moon, Sun, LayoutGrid, Bug } from 'lucide-react';
+import { Download, Moon, Sun, LayoutGrid, Bug, RotateCcw } from 'lucide-react';
 import { useTheme } from './ThemeContextProvider';
 import { useStore } from '../store';
 import { DebugView } from './DebugView';
@@ -15,6 +15,7 @@ export const ApplicationToolbar: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const diagramType = useStore((state) => state.diagram.type);
   const autoLayout = useStore((state) => state.autoLayout);
+  const resetCode = useStore((state) => state.resetCode);
   
   const handleExportPng = () => {
     window.dispatchEvent(new CustomEvent('export-png'));
@@ -26,6 +27,12 @@ export const ApplicationToolbar: React.FC = () => {
 
   const handleAutoLayout = () => {
     autoLayout();
+  };
+
+  const handleReset = () => {
+    if (confirm('Reset to default example code? Your current code will be lost.')) {
+      resetCode();
+    }
   };
 
   const [debugOpen, setDebugOpen] = React.useState(false);
@@ -70,6 +77,10 @@ export const ApplicationToolbar: React.FC = () => {
           <Button onClick={handleAutoLayout} variant="outline" size="sm">
             <LayoutGrid className="w-4 h-4 mr-2" />
             Auto Layout
+          </Button>
+          <Button onClick={handleReset} variant="outline" size="sm">
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset
           </Button>
           <Button onClick={toggleTheme} variant="ghost" size="default">
             {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}

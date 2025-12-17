@@ -1,4 +1,4 @@
-import type { RenderStack, Renderable, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable, ConnectorRenderable, InterfaceConnectorRenderable, DelegateConnectorRenderable, SimpleConnectorRenderable } from '../types/renderables';
+import type { RenderStack, Renderable, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable, ConnectorRenderable, LineConnectorRenderable, BallConnectorRenderable, SocketConnectorRenderable } from '../types/renderables';
 import type { AtomicRenderStack, AtomicRenderable, AtomicGroup, AtomicRect, AtomicText, AtomicLine, AtomicArc } from '../types/atomic';
 
 export function flattenToAtomicStack(stack: RenderStack): AtomicRenderStack {
@@ -168,16 +168,9 @@ function convertBookIcon(icon: BookIconRenderable): AtomicGroup {
   };
 }
 
-// Helper for symbols
-// Symbols are defined growing along positive X from (0,0).
-// (0,0) is the connection point (where the line meets the symbol).
-const getSymbolLength = (symbol?: string) => {
-    if (!symbol) return 0;
-    if (symbol === 'ball') return 6; // Center is 6. Back is 0. Distance 6 aligns center.
-    if (symbol === 'socket-left') return 10; // 0..10 (Back 0, Open 10)
-    if (symbol === 'socket-right') return 10; // 0..10 (Tips 0, Bulge 10)
-    if (symbol === 'arrow') return 10;
-    return 0;
+// Helper for arrow symbol length (only arrows are used now)
+const getArrowLength = (): number => {
+    return 10;
 };
 
 const addSymbol = (conn: ConnectorRenderable, children: AtomicRenderable[], symbol: string, x: number, y: number, rotation: number, suffix: string) => {
@@ -205,7 +198,7 @@ const addSymbol = (conn: ConnectorRenderable, children: AtomicRenderable[], symb
                 x: 6,
                 y: 0,
                 radius: 6,
-                fill: (conn as InterfaceConnectorRenderable).symbolBgColor || '#fff',
+                fill: '#fff',
                 stroke: conn.color,
                 strokeWidth: conn.lineWidth
             });
@@ -263,153 +256,83 @@ const addSymbol = (conn: ConnectorRenderable, children: AtomicRenderable[], symb
     }
 };
 
-function convertInterfaceConnector(conn: InterfaceConnectorRenderable, pointsConfig: {x1: number, y1: number, x2: number, y2: number, ux: number, uy: number, angle: number}): AtomicRenderable[] {
-    const children: AtomicRenderable[] = [];
-    const { x1, y1, x2, y2, ux, uy, angle } = pointsConfig;
-    
-    const midX = (x1 + x2) / 2;
-    const midY = (y1 + y2) / 2;
-    
-    const lenStart = getSymbolLength(conn.startSymbol);
-    const lenEnd = getSymbolLength(conn.endSymbol);
-
-    // Left Symbol (Start -> Mid)
-    if (conn.startSymbol) {
-       const sx = midX - ux * lenStart;
-       const sy = midY - uy * lenStart;
-       addSymbol(conn, children, conn.startSymbol, sx, sy, angle, 'start');
-       
-       // Line 1: Start -> Symbol Origin (sx)
-       children.push({
-          id: `${conn.id}-line-1`,
-          type: 'line',
-          points: [x1, y1, sx, sy],
-          stroke: conn.color,
-          strokeWidth: conn.lineWidth
-      });
-    } else {
-       children.push({
-          id: `${conn.id}-line-1`,
-          type: 'line',
-          points: [x1, y1, midX, midY],
-          stroke: conn.color,
-          strokeWidth: conn.lineWidth
-      });
-    }
-    
-    // Right Symbol (End -> Mid)
-    if (conn.endSymbol) {
-        const sx = midX + ux * lenEnd;
-        const sy = midY + uy * lenEnd;
-        addSymbol(conn, children, conn.endSymbol, sx, sy, angle + 180, 'end');
-        
-        // Line 2: Symbol Origin (sx) -> End
-        children.push({
-            id: `${conn.id}-line-2`,
-            type: 'line',
-            points: [sx, sy, x2, y2],
-            stroke: conn.color,
-            strokeWidth: conn.lineWidth
-        });
-    } else {
-        children.push({
-            id: `${conn.id}-line-2`,
-            type: 'line',
-            points: [midX, midY, x2, y2],
-            stroke: conn.color,
-            strokeWidth: conn.lineWidth
-        });
-    }
-    return children;
-}
-
-function convertDelegateConnector(conn: DelegateConnectorRenderable, pointsConfig: {x1: number, y1: number, x2: number, y2: number, ux: number, uy: number, angle: number}): AtomicRenderable[] {
-    const children: AtomicRenderable[] = [];
-    const { x1, y1, x2, y2, ux, uy, angle } = pointsConfig;
-
-    const lenEnd = getSymbolLength(conn.symbolEnd);
-    
-    const lineX2 = x2 - ux * lenEnd;
-    const lineY2 = y2 - uy * lenEnd;
-    
-    children.push({
-        id: `${conn.id}-line`,
-        type: 'line',
-        points: [x1, y1, lineX2, lineY2],
-        stroke: conn.color,
-        strokeWidth: conn.lineWidth,
-        dash: [conn.dashSize || 5, conn.dashSize || 5],
-        hitStrokeWidth: 10
-    });
-    
-    if (conn.symbolEnd) {
-        addSymbol(conn, children, conn.symbolEnd, x2, y2, angle, 'end');
-    }
-    return children;
-}
-
-function convertSimpleConnector(conn: SimpleConnectorRenderable, pointsConfig: {x1: number, y1: number, x2: number, y2: number, ux: number, uy: number, angle: number}): AtomicRenderable[] {
-    const children: AtomicRenderable[] = [];
-    const { x1, y1, x2, y2, ux, uy, angle } = pointsConfig;
-
-    const lenStart = getSymbolLength(conn.symbolStart);
-    const lenEnd = getSymbolLength(conn.symbolEnd);
-    
-    const lineX1 = x1 + ux * lenStart;
-    const lineY1 = y1 + uy * lenStart;
-    const lineX2 = x2 - ux * lenEnd;
-    const lineY2 = y2 - uy * lenEnd;
-    
-    children.push({
-        id: `${conn.id}-line`,
-        type: 'line',
-        points: [lineX1, lineY1, lineX2, lineY2],
-        stroke: conn.color,
-        strokeWidth: conn.lineWidth,
-        hitStrokeWidth: 10
-    });
-    
-    if (conn.symbolStart === 'arrow') addSymbol(conn, children, 'arrow', x1, y1, angle + 180, 'start');
-    if (conn.symbolEnd === 'arrow') addSymbol(conn, children, 'arrow', x2, y2, angle, 'end');
-    
-    return children;
-}
+// Old connector conversion functions removed - now using simple chained connectors
 
 function convertConnector(conn: ConnectorRenderable): AtomicGroup {
-  let children: AtomicRenderable[] = [];
+  const children: AtomicRenderable[] = [];
   
-  const points = conn.points.flat();
-  const [x1, y1, x2, y2] = points;
-  
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-  const len = Math.sqrt(dx*dx + dy*dy);
-  const ux = dx / (len || 1); 
-  const uy = dy / (len || 1);
-
-  const pointsConfig = { x1, y1, x2, y2, ux, uy, angle };
-
-  if (conn.connectorType === 'interface') {
-      children = convertInterfaceConnector(conn, pointsConfig);
-  } else if (conn.connectorType === 'delegate') {
-      children = convertDelegateConnector(conn, pointsConfig);
-  } else {
-      children = convertSimpleConnector(conn, pointsConfig);
-  }
-
-  // Label (Common)
-  if (conn.label) {
+  if (conn.connectorType === 'line') {
+      // Line connector - simple line with optional arrow and label
+      const lineConn = conn as LineConnectorRenderable;
+      const points = lineConn.points.flat();
+      const [x1, y1, x2, y2] = points;
+      
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      
+      // Draw the line
       children.push({
-          id: `${conn.id}-label`,
-          type: 'text',
-          x: (x1 + x2)/2,
-          y: (y1 + y2)/2,
-          text: conn.label,
-          fill: conn.labelColor || '#000',
-          fontSize: 12,
-          align: 'center',
-          offset: { x: conn.label.length * 3, y: 15 } 
+          id: `${conn.id}-line`,
+          type: 'line',
+          points: [x1, y1, x2, y2],
+          stroke: conn.color,
+          strokeWidth: conn.lineWidth,
+          dash: lineConn.dashed ? [lineConn.dashSize || 5, lineConn.dashSize || 5] : undefined,
+          hitStrokeWidth: 10
+      });
+      
+      // Add arrow at start if needed
+      if (lineConn.arrowStart) {
+          addSymbol(lineConn as any, children, 'arrow', x1, y1, angle + 180, 'start');
+      }
+      
+      // Add arrow at end if needed
+      if (lineConn.arrowEnd) {
+          addSymbol(lineConn as any, children, 'arrow', x2, y2, angle, 'end');
+      }
+      
+      // Add label if present
+      if (lineConn.label) {
+          children.push({
+              id: `${conn.id}-label`,
+              type: 'text',
+              x: (x1 + x2) / 2,
+              y: (y1 + y2) / 2,
+              text: lineConn.label,
+              fill: lineConn.labelColor || '#000',
+              fontSize: 12,
+              align: 'center',
+              offset: { x: 0, y: 0 }
+          });
+      }
+  } else if (conn.connectorType === 'ball') {
+      // Ball connector - just draw a ball symbol
+      const ballConn = conn as BallConnectorRenderable;
+      children.push({
+          id: `${conn.id}-circle`,
+          type: 'circle',
+          x: ballConn.x,
+          y: ballConn.y,
+          radius: ballConn.radius,
+          fill: ballConn.fillColor,
+          stroke: conn.color,
+          strokeWidth: conn.lineWidth
+      });
+  } else if (conn.connectorType === 'socket') {
+      // Socket connector - draw a socket (arc)
+      const socketConn = conn as SocketConnectorRenderable;
+      children.push({
+          id: `${conn.id}-arc`,
+          type: 'arc',
+          x: socketConn.x,
+          y: socketConn.y,
+          innerRadius: socketConn.radius,
+          outerRadius: socketConn.radius,
+          rotation: socketConn.angle + (socketConn.direction === 'left' ? 90 : -90),
+          angle: 180,
+          stroke: conn.color,
+          strokeWidth: conn.lineWidth
       });
   }
 

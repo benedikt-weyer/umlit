@@ -11,6 +11,7 @@ const getTokenColor = (type: TokenType, theme: 'light' | 'dark'): string => {
   switch (type) {
     case TokenType.KEYWORD_PORT:
     case TokenType.KEYWORD_ON:
+    case TokenType.KEYWORD_WITH:
       return isDark ? '#569cd6' : '#0000ff'; // Blue
     case TokenType.SIDE:
       return isDark ? '#c586c0' : '#af00db'; // Purple

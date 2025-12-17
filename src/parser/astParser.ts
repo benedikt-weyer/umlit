@@ -113,11 +113,44 @@ export function parseToAST(code: string): ParsedCst {
       return;
     }
     
-    // 2. Node or Edge
-    // Node starts with [id]
-    // Edge starts with Identifier (source) -> ...
+    // 2. Node or Named Edge
+    // Node: [id] label @ x,y { or [id] label
+    // Named Edge: [name] source -())- target
     
     if (match(TokenType.LBRACKET)) {
+      // Look ahead to determine if this is a node or a named connector
+      // [id] IDENTIFIER (if next is arrow/connector, it's an edge, else it's a node)
+      const checkIndex = currentTokenIndex;
+      consume(TokenType.LBRACKET);
+      consume(TokenType.IDENTIFIER);
+      consume(TokenType.RBRACKET);
+      
+      // Check what comes after [id]
+      const nextToken = peek();
+      
+      // Reset to original position
+      currentTokenIndex = checkIndex;
+      
+      // If next token is an identifier followed by a connector, it's a named edge
+      if (nextToken.type === TokenType.IDENTIFIER) {
+        // Look even further ahead
+        const checkIndex2 = currentTokenIndex;
+        consume(TokenType.LBRACKET);
+        consume(TokenType.IDENTIFIER);
+        consume(TokenType.RBRACKET);
+        consume(TokenType.IDENTIFIER); // source node
+        const afterSource = peek();
+        currentTokenIndex = checkIndex2;
+        
+        if (afterSource.type === TokenType.ARROW || 
+            afterSource.type === TokenType.DELEGATE_ARROW || 
+            afterSource.type === TokenType.INTERFACE_CONNECTOR) {
+          parseEdge();
+          return;
+        }
+      }
+      
+      // Otherwise it's a node
       parseNode();
     } else if (match(TokenType.IDENTIFIER)) {
       parseEdge();
@@ -195,6 +228,15 @@ export function parseToAST(code: string): ParsedCst {
   }
   
   function parseEdge() {
+    // Check if this is a named connector: [ConnectionName] source ... target
+    let connectorName: string | undefined;
+    if (match(TokenType.LBRACKET)) {
+      consume(TokenType.LBRACKET);
+      const nameToken = consume(TokenType.IDENTIFIER, "Expected connector name");
+      connectorName = nameToken.value;
+      consume(TokenType.RBRACKET);
+    }
+    
     // source . port ... or source ...
     const sourceToken = consume(TokenType.IDENTIFIER, "Expected source node");
     let sourcePortId: string | undefined;
@@ -267,7 +309,8 @@ export function parseToAST(code: string): ParsedCst {
     }
     
     connectors.push({
-      id: `conn-${edgeIdCounter++}`, // Changed prefix to conn-
+      id: connectorName || `conn-${edgeIdCounter++}`, // Use name if provided, otherwise generate
+      name: connectorName,
       sourceNodeId,
       targetNodeId,
       sourcePortId,
@@ -284,10 +327,34 @@ export function parseToAST(code: string): ParsedCst {
     consume(TokenType.LBRACKET);
     const id = consume(TokenType.IDENTIFIER).value;
     consume(TokenType.RBRACKET);
-    consume(TokenType.KEYWORD_ON);
-    consume(TokenType.LBRACKET);
-    const nodeId = consume(TokenType.IDENTIFIER).value;
-    consume(TokenType.RBRACKET);
+    
+    // New syntax: port [p1] with [Connection1] left : API
+    // Old syntax: port [p1] on [NodeB] left : API
+    let nodeId: string | undefined;
+    let connectorRef: string | undefined;
+    
+    if (match(TokenType.KEYWORD_WITH)) {
+      // New syntax with connector reference
+      consume(TokenType.KEYWORD_WITH);
+      consume(TokenType.LBRACKET);
+      connectorRef = consume(TokenType.IDENTIFIER).value;
+      consume(TokenType.RBRACKET);
+      
+      // Infer node from context (current node in stack)
+      if (nodeStack.length > 0) {
+        nodeId = nodeStack[nodeStack.length - 1].id;
+      } else {
+        throw new ParserError("Port with connector reference must be inside a node block", peek().line, peek().column);
+      }
+    } else if (match(TokenType.KEYWORD_ON)) {
+      // Old syntax
+      consume(TokenType.KEYWORD_ON);
+      consume(TokenType.LBRACKET);
+      nodeId = consume(TokenType.IDENTIFIER).value;
+      consume(TokenType.RBRACKET);
+    } else {
+      throw new ParserError("Expected 'with' or 'on' after port ID", peek().line, peek().column);
+    }
     
     const sideToken = consume(TokenType.SIDE);
     const side = sideToken.value as 'left' | 'right' | 'top' | 'bottom';
@@ -314,7 +381,7 @@ export function parseToAST(code: string): ParsedCst {
     const findAndAddPort = (nodes: ASTNode[]): boolean => {
       for (const node of nodes) {
         if (node.id === nodeId) {
-          node.ports.push({ id, label, side });
+          node.ports.push({ id, label, side, connectorRef });
           return true;
         }
         if (findAndAddPort(node.children)) {

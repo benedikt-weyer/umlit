@@ -217,7 +217,8 @@ export function parseToAST(code: string): ParsedCst {
     let isDelegate = false;
     
     if (match(TokenType.ARROW)) {
-      consume(TokenType.ARROW);
+      const token = consume(TokenType.ARROW);
+      edgeType = token.value;
     } else if (match(TokenType.DELEGATE_ARROW)) {
       consume(TokenType.DELEGATE_ARROW);
       isDelegate = true;

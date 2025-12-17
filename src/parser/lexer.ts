@@ -104,6 +104,10 @@ export class Lexer {
       if (this.match('->delegate->')) {
         return this.advanceWithToken(TokenType.DELEGATE_ARROW, '->delegate->', 12);
       }
+      // Check for -->
+      if (this.match('-->')) {
+        return this.advanceWithToken(TokenType.ARROW, '-->', 3);
+      }
       // Check for ->
       if (this.match('->')) {
         return this.advanceWithToken(TokenType.ARROW, '->', 2);

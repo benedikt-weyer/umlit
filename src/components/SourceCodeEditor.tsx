@@ -63,6 +63,43 @@ export const SourceCodeEditor: React.FC = () => {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const tabChar = '  '; // 2 spaces
+      
+      if (e.shiftKey) {
+        // Shift+Tab: Unindent
+        const beforeCursor = code.substring(0, start);
+        const lineStart = beforeCursor.lastIndexOf('\n') + 1;
+        const lineText = code.substring(lineStart, start);
+        
+        if (lineText.startsWith(tabChar)) {
+          const newCode = code.substring(0, lineStart) + code.substring(lineStart + tabChar.length);
+          setCode(newCode);
+          
+          // Adjust cursor position
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = start - tabChar.length;
+          }, 0);
+        }
+      } else {
+        // Tab: Indent
+        const newCode = code.substring(0, start) + tabChar + code.substring(end);
+        setCode(newCode);
+        
+        // Move cursor after the inserted tab
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = start + tabChar.length;
+        }, 0);
+      }
+    }
+  };
+
   const lines = code.split('\n');
   const lineCount = lines.length;
 
@@ -135,6 +172,7 @@ export const SourceCodeEditor: React.FC = () => {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               onScroll={handleScroll}
+              onKeyDown={handleKeyDown}
               className={cn(
                 "absolute inset-0 w-full h-full resize-none border-none outline-none p-0 pl-3 py-4 font-mono text-[14px] leading-[21px] whitespace-pre overflow-auto",
                 "bg-transparent text-transparent caret-foreground focus:ring-0"

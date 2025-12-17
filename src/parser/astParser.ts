@@ -1,6 +1,18 @@
 import type { DiagramAST, ASTNode, ASTEdge, ASTPort, DiagramType } from '../types/ast';
 import { Lexer, TokenType, type Token } from './lexer';
 
+export class ParserError extends Error {
+  line: number;
+  column: number;
+  
+  constructor(message: string, line: number, column: number) {
+    super(`${message} (Line ${line}, Column ${column})`);
+    this.name = 'ParserError';
+    this.line = line;
+    this.column = column;
+  }
+}
+
 const MAX_DEPTH = 50;
 
 export function parseToAST(code: string): DiagramAST {
@@ -25,7 +37,7 @@ export function parseToAST(code: string): DiagramAST {
     if (token.type === type) {
       return advance();
     }
-    throw new Error(errorMsg || `Expected ${type} but got ${token.type} at line ${token.line}, col ${token.column}`);
+    throw new ParserError(errorMsg || `Expected ${type} but got ${token.type}`, token.line, token.column);
   }
   
   function match(type: TokenType): boolean {
@@ -217,7 +229,8 @@ export function parseToAST(code: string): DiagramAST {
       // const symbolMatch = type.match(/-([()]+)-/);
       // It expects dashes.
     } else {
-       throw new Error(`Unexpected token for edge connection: ${peek().type}`);
+       const token = peek();
+       throw new ParserError(`Unexpected token for edge connection: ${token.type}`, token.line, token.column);
     }
     
     // Target

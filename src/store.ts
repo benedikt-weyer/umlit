@@ -6,6 +6,7 @@ import { autoLayoutNodes, updateCodeWithPositions } from './utils/autoLayout';
 interface AppState {
   code: string;
   diagram: Diagram;
+  error: Error | null; // Store parser error
   setCode: (code: string) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
   autoLayout: () => void;
@@ -28,14 +29,20 @@ const DEFAULT_CODE = `[uml2.5-component] {
 
 // Initialize with auto-layout applied
 const initializeDiagram = () => {
-  const initialDiagram = parseDiagram(DEFAULT_CODE);
+  const { diagram: initialDiagram, error: initialError } = parseDiagram(DEFAULT_CODE);
+  
+  if (initialError) {
+      return { code: DEFAULT_CODE, diagram: initialDiagram, error: initialError };
+  }
+  
   const layoutedNodes = autoLayoutNodes(initialDiagram.nodes);
   const layoutedCode = updateCodeWithPositions(DEFAULT_CODE, layoutedNodes);
-  const layoutedDiagram = parseDiagram(layoutedCode);
+  const { diagram: layoutedDiagram, error: layoutError } = parseDiagram(layoutedCode);
   
   return {
     code: layoutedCode,
-    diagram: layoutedDiagram
+    diagram: layoutedDiagram,
+    error: layoutError || null
   };
 };
 
@@ -44,10 +51,11 @@ const initialState = initializeDiagram();
 export const useStore = create<AppState>((set) => ({
   code: initialState.code,
   diagram: initialState.diagram,
+  error: initialState.error,
   setCode: (code) =>
     set(() => {
-      const diagram = parseDiagram(code);
-      return { code, diagram };
+      const { diagram, error } = parseDiagram(code);
+      return { code, diagram, error: error || null };
     }),
   updateNodePosition: (id, x, y) =>
     set((state) => {

@@ -2,18 +2,25 @@ import type { Diagram, Node, Edge, Port } from '../types';
 import { parseToAST } from './astParser';
 import type { DiagramAST, ASTNode } from '../types/ast';
 
-export function parseDiagram(code: string): Diagram {
+export type ParseResult = {
+  diagram: Diagram;
+  error?: Error | any;
+};
+
+export function parseDiagram(code: string): ParseResult {
   try {
     const ast = parseToAST(code);
-    return convertASTToDiagram(ast);
+    return { diagram: convertASTToDiagram(ast) };
   } catch (error) {
     console.error("Parsing error:", error);
-    // Return empty diagram or basic fallback if needed, but for now throwing or returning empty
     return {
-      type: 'uml2.5-component',
-      nodes: [],
-      edges: [],
-      ports: []
+      diagram: {
+        type: 'uml2.5-component',
+        nodes: [],
+        edges: [],
+        ports: []
+      },
+      error
     };
   }
 }

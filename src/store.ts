@@ -27,7 +27,7 @@ const DEFAULT_CODE = `[uml2.5-component] {
   }
   [NodeC] Database
 
-  [Connection1] NodeA -())- NodeB1
+  [Connection1] ExportPDF NodeA -())- NodeB1
   [Connection2] NodeC -(()- NodeB2
 }`.trim();
 

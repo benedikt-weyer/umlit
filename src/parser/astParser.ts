@@ -133,21 +133,42 @@ export function parseToAST(code: string): ParsedCst {
       
       // If next token is an identifier followed by a connector, it's a named edge
       if (nextToken.type === TokenType.IDENTIFIER) {
-        // Look even further ahead
+        // Look even further ahead to handle optional interface name
+        // Could be: [Connection1] NodeA -())- NodeB1
+        // Or: [Connection1] ExportPDF NodeA -())- NodeB1
         const checkIndex2 = currentTokenIndex;
         consume(TokenType.LBRACKET);
         consume(TokenType.IDENTIFIER);
         consume(TokenType.RBRACKET);
-        consume(TokenType.IDENTIFIER); // source node
-        const afterSource = peek();
-        currentTokenIndex = checkIndex2;
+        consume(TokenType.IDENTIFIER); // First identifier (could be interface name OR source node)
+        const afterFirst = peek();
         
-        if (afterSource.type === TokenType.ARROW || 
-            afterSource.type === TokenType.DELEGATE_ARROW || 
-            afterSource.type === TokenType.INTERFACE_CONNECTOR) {
-          parseEdge();
-          return;
+        // Check if there's another identifier (meaning first was interface name)
+        if (afterFirst.type === TokenType.IDENTIFIER) {
+          consume(TokenType.IDENTIFIER); // Second identifier (source node)
+          const afterSecond = peek();
+          currentTokenIndex = checkIndex2;
+          
+          if (afterSecond.type === TokenType.ARROW || 
+              afterSecond.type === TokenType.DELEGATE_ARROW || 
+              afterSecond.type === TokenType.INTERFACE_CONNECTOR) {
+            parseEdge();
+            return;
+          }
+        } else {
+          // Only one identifier after [id], check if connector follows
+          currentTokenIndex = checkIndex2;
+          
+          if (afterFirst.type === TokenType.ARROW || 
+              afterFirst.type === TokenType.DELEGATE_ARROW || 
+              afterFirst.type === TokenType.INTERFACE_CONNECTOR) {
+            parseEdge();
+            return;
+          }
         }
+        
+        // Reset and fall through to node parsing
+        currentTokenIndex = checkIndex;
       }
       
       // Otherwise it's a node
@@ -237,6 +258,27 @@ export function parseToAST(code: string): ParsedCst {
       consume(TokenType.RBRACKET);
     }
     
+    // Check for optional interface name before source node
+    // Format: [ConnectionName] InterfaceName SourceNode -connector- TargetNode
+    // We need to look ahead to see if there are two identifiers before the connector symbol
+    let interfaceName: string | undefined;
+    
+    const checkIndex = currentTokenIndex;
+    const firstId = peek();
+    if (firstId.type === TokenType.IDENTIFIER) {
+      advance(); // consume first identifier
+      const secondToken = peek();
+      
+      // If the second token is also an identifier, first is interface name, second is source
+      if (secondToken.type === TokenType.IDENTIFIER) {
+        interfaceName = firstId.value;
+        // Continue parsing with second identifier as source
+      } else {
+        // Only one identifier, it's the source node, reset
+        currentTokenIndex = checkIndex;
+      }
+    }
+    
     // source . port ... or source ...
     const sourceToken = consume(TokenType.IDENTIFIER, "Expected source node");
     let sourcePortId: string | undefined;
@@ -295,7 +337,7 @@ export function parseToAST(code: string): ParsedCst {
         targetPortId = parts[1];
     }
     
-    // Label
+    // Label (can be interface name or explicit label after colon)
     let label: string | undefined;
     if (match(TokenType.COLON)) {
       consume(TokenType.COLON);
@@ -306,6 +348,11 @@ export function parseToAST(code: string): ParsedCst {
            l += advance().value;
       }
       label = l.trim();
+    }
+    
+    // If no explicit label but we have an interface name, use that as the label
+    if (!label && interfaceName) {
+      label = interfaceName;
     }
     
     connectors.push({

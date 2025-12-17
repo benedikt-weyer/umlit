@@ -1,5 +1,5 @@
-import type { Diagram, Node } from '../types';
-import type { RenderStack, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable, ConnectorRenderable, Renderable, LineConnectorRenderable, BallConnectorRenderable, SocketConnectorRenderable } from '../types/renderables';
+import type { Diagram, Node, Connector } from '../types';
+import type { RenderStack, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable, Renderable, LineConnectorRenderable } from '../types/renderables';
 
 // Helper to calculate node dimensions
 // Helper to calculate node bounds
@@ -46,22 +46,6 @@ function getNodeBounds(node: Node, allNodes: Node[]): { minX: number; maxX: numb
   const verticalPadding = 150; // Increased vertical padding around children
   
   return {
-    minX: minX - sidePadding,
-    maxX: maxX + sidePadding,
-    minY: minY - verticalPadding - labelSpace, // Extra space for label on top? Or symmetric?
-    // Label is usually top centered or middle. If container, label is top.
-    // Original logic: height = (maxY - minY) + verticalPadding * 2 + labelSpace
-    // Let's create symmetric padding around content, then add label space at top?
-    // Let's stick to simple padding expansion for now.
-    
-    // Actually, we want the rect to enclose children.
-    // X: minX - padding, maxX + padding.
-    // Y: minY - padding - labelSpace, maxY + padding.
-    
-    // Wait, previous logic:
-    // width = (maxX - minX) + sidePadding * 2
-    // height = (maxY - minY) + verticalPadding * 2 + labelSpace
-    
     minX: minX - sidePadding,
     maxX: maxX + sidePadding,
     minY: minY - verticalPadding - labelSpace,
@@ -284,7 +268,6 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
     const midY = (startY + endY) / 2;
     const deltaX = endX - startX;
     const deltaY = endY - startY;
-    const len = Math.sqrt(deltaX*deltaX + deltaY*deltaY);
     const angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
     
     if (hasInterfaceSymbols) {
@@ -369,6 +352,22 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
                 color: baseConn.color,
                 lineWidth: baseConn.lineWidth
             });
+            
+            // Add label if present (for -(()- connector)
+            if (baseConn.label) {
+                stack.push({
+                    id: `${baseConn.id}-label`,
+                    type: 'connector',
+                    zIndex: baseConn.zIndex + 2,
+                    x: 0, y: 0,
+                    connectorType: 'line',
+                    points: [[midX, midY], [midX, midY]], // Zero-length line just for the label
+                    color: baseConn.color,
+                    lineWidth: 0, // Invisible line
+                    label: baseConn.label,
+                    labelColor: textColor
+                });
+            }
         } else if (isFullLollipop) {
             // -())- : Ball on left, socket opens left
             
@@ -420,6 +419,22 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
                 lineWidth: baseConn.lineWidth,
                 fillColor: theme === 'dark' ? '#000000' : '#ffffff'
             });
+            
+            // Add label if present (for -())- connector)
+            if (baseConn.label) {
+                stack.push({
+                    id: `${baseConn.id}-label`,
+                    type: 'connector',
+                    zIndex: baseConn.zIndex + 2,
+                    x: 0, y: 0,
+                    connectorType: 'line',
+                    points: [[midX, midY], [midX, midY]], // Zero-length line just for the label
+                    color: baseConn.color,
+                    lineWidth: 0, // Invisible line
+                    label: baseConn.label,
+                    labelColor: textColor
+                });
+            }
         } else {
             // Single symbol connector (ball OR socket, not both)
             // For internal delegates: symbol should be near child (3/4 from start, which is 1/4 from end/child)
@@ -498,6 +513,22 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
                     color: baseConn.color,
                     lineWidth: baseConn.lineWidth
                 });
+                
+                // Add label if present (for single symbol connectors)
+                if (baseConn.label) {
+                    stack.push({
+                        id: `${baseConn.id}-label`,
+                        type: 'connector',
+                        zIndex: baseConn.zIndex + 2,
+                        x: 0, y: 0,
+                        connectorType: 'line',
+                        points: [[symbolX, symbolY], [symbolX, symbolY]], // Zero-length line just for the label
+                        color: baseConn.color,
+                        lineWidth: 0, // Invisible line
+                        label: baseConn.label,
+                        labelColor: textColor
+                    });
+                }
             }
         }
     } else {

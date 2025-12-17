@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { useTheme } from './ThemeContextProvider';
 import { cn } from '@/lib/utils';
 import { Lexer, TokenType, type Token } from '../parser/lexer';
+import { ParserError } from '../parser/astParser';
 
 const getTokenColor = (type: TokenType, theme: 'light' | 'dark'): string => {
   const isDark = theme === 'dark';
@@ -107,11 +108,24 @@ export const SourceCodeEditor: React.FC = () => {
               }}
               aria-hidden="true"
             >
-              {tokens.map((token, i) => (
-                <span key={i} style={{ color: getTokenColor(token.type, theme as 'light'|'dark') }}>
-                  {token.value}
-                </span>
-              ))}
+              {tokens.map((token, i) => {
+                const isError = error instanceof ParserError && 
+                                token.line === error.line && 
+                                token.column === error.column;
+                
+                return (
+                  <span 
+                    key={i} 
+                    style={{ 
+                      color: getTokenColor(token.type, theme as 'light'|'dark'),
+                      textDecoration: isError ? 'underline wavy red' : undefined,
+                      textDecorationSkipInk: 'none'
+                    }}
+                  >
+                    {token.value}
+                  </span>
+                );
+              })}
             </pre>
 
             {/* Transparent Textarea for Input */}

@@ -77,7 +77,7 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
   const bgColor = theme === 'dark' ? '#1f1f1f' : '#ffffff';
   const borderColor = theme === 'dark' ? '#666666' : '#cccccc';
   const textColor = theme === 'dark' ? '#ffffff' : '#000000';
-  const portColor = theme === 'dark' ? '#4a9eff' : '#0066cc';
+  const portColor = bgColor; // Ports use same color as normal components
   
   // Process nodes (sorted by depth to render parents before children)
   const sortedNodes = [...diagram.nodes].sort((a, b) => (a.depth || 0) - (b.depth || 0));
@@ -129,7 +129,7 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
     nodePorts.forEach(port => {
         let portX = centerX;
         let portY = centerY;
-        const portSize = 8;
+        const portSize = 16; // Larger port size
         
         switch (port.side) {
           case 'left':

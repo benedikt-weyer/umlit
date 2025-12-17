@@ -41,9 +41,9 @@ function getNodeBounds(node: Node, allNodes: Node[]): { minX: number; maxX: numb
   });
   
   // Add padding for parent
-  const sidePadding = 20;
+  const sidePadding = 150; // Increased horizontal padding around children
   const labelSpace = 35;
-  const verticalPadding = 20;
+  const verticalPadding = 150; // Increased vertical padding around children
   
   return {
     minX: minX - sidePadding,

@@ -267,26 +267,49 @@ export const Edge: React.FC<EdgeType> = ({ source, target, type, isDelegate, ste
     );
   }
 
-  // Regular edges with interface symbols
+  // Check if it's an interface connector (has symbols)
+  const hasSymbols = leftSymbol !== null || rightSymbol !== null;
+
+  if (hasSymbols) {
+    return (
+      <Group>
+        {/* Line segment from start to left symbol */}
+        <Line
+          points={[startX, startY, lineBreakLeftX, lineBreakLeftY]}
+          stroke={lineColor}
+          strokeWidth={2}
+        />
+        
+        {/* Line segment from right symbol to end */}
+        <Line
+          points={[lineBreakRightX, lineBreakRightY, endX, endY]}
+          stroke={lineColor}
+          strokeWidth={2}
+        />
+        
+        {/* Render symbols */}
+        {leftSymbol && renderSymbol(leftSymbol, true)}
+        {rightSymbol && renderSymbol(rightSymbol, false)}
+      </Group>
+    );
+  }
+
+  // Default: Simple solid arrow
   return (
     <Group>
-      {/* Line segment from start to left symbol */}
       <Line
-        points={[startX, startY, lineBreakLeftX, lineBreakLeftY]}
+        points={[startX, startY, endX, endY]}
         stroke={lineColor}
         strokeWidth={2}
       />
-      
-      {/* Line segment from right symbol to end */}
-      <Line
-        points={[lineBreakRightX, lineBreakRightY, endX, endY]}
+      <Arrow
+        points={[endX - Math.cos(angle) * 10, endY - Math.sin(angle) * 10, endX, endY]}
+        pointerLength={8}
+        pointerWidth={8}
+        fill={lineColor}
         stroke={lineColor}
         strokeWidth={2}
       />
-      
-      {/* Render symbols */}
-      {leftSymbol && renderSymbol(leftSymbol, true)}
-      {rightSymbol && renderSymbol(rightSymbol, false)}
     </Group>
   );
 };

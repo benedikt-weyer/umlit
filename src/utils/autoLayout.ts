@@ -8,38 +8,11 @@ interface LayoutConfig {
 }
 
 const DEFAULT_CONFIG: LayoutConfig = {
-  horizontalSpacing: 200,
-  verticalSpacing: 150,
+  horizontalSpacing: 300,  // Increased for larger nested components
+  verticalSpacing: 250,    // Increased for larger nested components
   startX: 50,
   startY: 50
 };
-
-// Simple: calculate bounding box from child positions
-function getBoundingBox(childNodes: Node[], allNodes: Node[]): { width: number; height: number; minY: number; maxY: number } {
-  if (childNodes.length === 0) {
-    return { width: 150, height: 80, minY: 0, maxY: 0 };
-  }
-  
-  let minX = Infinity, maxX = -Infinity;
-  let minY = Infinity, maxY = -Infinity;
-  
-  childNodes.forEach(child => {
-    const childBounds = getNodeBounds(child, allNodes);
-    minX = Math.min(minX, child.x - childBounds.width / 2);
-    maxX = Math.max(maxX, child.x + childBounds.width / 2);
-    minY = Math.min(minY, child.y - childBounds.height / 2);
-    maxY = Math.max(maxY, child.y + childBounds.height / 2);
-  });
-  
-  const sidePadding = 50; // Increased horizontal padding
-  const labelSpace = 35;
-  const verticalPadding = 50; // Increased vertical padding
-  
-  const width = Math.max(200, (maxX - minX) + sidePadding * 2);
-  const height = Math.max(120, (maxY - minY) + verticalPadding * 2 + labelSpace);
-  
-  return { width, height, minY, maxY };
-}
 
 // Calculate node dimensions including children (for rendering)
 // Helper to calculate node position bounds (minX, maxX, minY, maxY)
@@ -81,9 +54,9 @@ function getNodePositionBounds(node: Node, allNodes: Node[]): { minX: number; ma
   });
   
   // Add padding for parent
-  const sidePadding = 50;
-  const labelSpace = 35;
-  const verticalPadding = 50;
+  const sidePadding = 80;
+  const labelSpace = 40;
+  const verticalPadding = 80;
   
   return {
     minX: minX - sidePadding,
@@ -105,9 +78,9 @@ function getNodeBounds(node: Node, allNodes: Node[]): { width: number; height: n
     return { width: 150, height: 80 };
   }
   
-  const sidePadding = 50; // Increased horizontal padding
-  const labelSpace = 35;
-  const verticalPadding = 50; // Increased vertical padding
+  const sidePadding = 80; // More horizontal padding for nested components
+  const labelSpace = 40;
+  const verticalPadding = 80; // More vertical padding for nested components
   
   let minX = Infinity, maxX = -Infinity;
   let minY = Infinity, maxY = -Infinity;
@@ -126,35 +99,75 @@ function getNodeBounds(node: Node, allNodes: Node[]): { width: number; height: n
   return { width, height };
 }
 
-// Layout children within a parent container
+// Layout children within a parent container (bottom-up approach)
 function layoutChildrenInParent(parentId: string, parentX: number, parentY: number, nodes: Node[]): Node[] {
   const children = nodes.filter(n => n.parentId === parentId);
   if (children.length === 0) return nodes;
   
   let newNodes = [...nodes];
-  const childSpacing = 120; // Generous spacing between child elements
+  const childSpacing = 150; // Generous spacing between child elements
   
-  // Just position children in a simple stack - parent will size around them
+  // First, normalize all children to origin (0,0) before layout
+  // This ensures we're working with relative positions
+  children.forEach(child => {
+    const childIndex = newNodes.findIndex(n => n.id === child.id);
+    if (childIndex !== -1) {
+      const currentChild = newNodes[childIndex];
+      const deltaX = 0 - (currentChild.x || 0);
+      const deltaY = 0 - (currentChild.y || 0);
+      
+      // Move child to origin
+      newNodes[childIndex] = { ...currentChild, x: 0, y: 0 };
+      
+      // Move all descendants by the same delta
+      const moveDescendants = (nodeId: string) => {
+        const descendants = newNodes.filter(n => n.parentId === nodeId);
+        descendants.forEach(desc => {
+          const descIndex = newNodes.findIndex(n => n.id === desc.id);
+          if (descIndex !== -1) {
+            newNodes[descIndex] = {
+              ...newNodes[descIndex],
+              x: newNodes[descIndex].x + deltaX,
+              y: newNodes[descIndex].y + deltaY
+            };
+          }
+          moveDescendants(desc.id);
+        });
+      };
+      moveDescendants(child.id);
+    }
+  });
+  
+  // Then, recursively layout all grandchildren (bottom-up)
+  // Use 0,0 as temp position since we've already normalized positions
+  children.forEach(child => {
+    newNodes = layoutChildrenInParent(child.id, 0, 0, newNodes);
+  });
+  
+  // Now position children in a vertical stack relative to parent
   let currentY = parentY;
   
   children.forEach((child, index) => {
-    const childBounds = getNodeBounds(newNodes.find(n => n.id === child.id) || child, newNodes);
+    // Get updated child reference
+    const updatedChild = newNodes.find(n => n.id === child.id);
+    if (!updatedChild) return;
+    
+    // Get bounds after grandchildren have been laid out
+    const childBounds = getNodeBounds(updatedChild, newNodes);
     
     const childX = parentX;
     const childY = currentY + (index === 0 ? childBounds.height / 2 : 0);
     
+    // Calculate delta from current position to new position
+    const deltaX = childX - (updatedChild.x || 0);
+    const deltaY = childY - (updatedChild.y || 0);
+    
     // Update child position
     const childIndex = newNodes.findIndex(n => n.id === child.id);
     if (childIndex !== -1) {
-      const deltaX = childX - (newNodes[childIndex].x || 0);
-      const deltaY = childY - (newNodes[childIndex].y || 0);
-      
       newNodes[childIndex] = { ...newNodes[childIndex], x: childX, y: childY };
       
-      // Recursively layout and move descendants
-      newNodes = layoutChildrenInParent(child.id, childX, childY, newNodes);
-      
-      // Move all descendants by delta
+      // Move all descendants by the same delta
       const moveDescendants = (nodeId: string) => {
         const descendants = newNodes.filter(n => n.parentId === nodeId);
         descendants.forEach(desc => {
@@ -189,6 +202,12 @@ export function autoLayoutNodes(nodes: Node[], diagram?: Diagram, config: Partia
   
   if (rootNodes.length === 0) return newNodes;
   
+  // Helper to check if node has a parent
+  function getNodeParent(nodeId: string, nodes: Node[]): string | undefined {
+    const node = nodes.find(n => n.id === nodeId);
+    return node?.parentId;
+  }
+  
   // Build map of port-connected nodes if diagram is provided
   const portConnections = new Map<string, { portNodeId: string, portId: string, port?: Port }>();
   if (diagram) {
@@ -212,12 +231,6 @@ export function autoLayoutNodes(nodes: Node[], diagram?: Diagram, config: Partia
     });
   }
   
-  // Helper to check if node has a parent
-  function getNodeParent(nodeId: string, nodes: Node[]): string | undefined {
-    const node = nodes.find(n => n.id === nodeId);
-    return node?.parentId;
-  }
-  
   // Separate port-connected nodes from grid nodes
   const portConnectedNodes = rootNodes.filter(n => portConnections.has(n.id));
   const gridNodes = rootNodes.filter(n => !portConnections.has(n.id));
@@ -225,32 +238,93 @@ export function autoLayoutNodes(nodes: Node[], diagram?: Diagram, config: Partia
   // Calculate grid dimensions for non-port-connected nodes
   const cols = Math.ceil(Math.sqrt(gridNodes.length));
   
-  // Position grid nodes first
-  gridNodes.forEach((rootNode, index) => {
+  // First pass: recursively layout all children bottom-up and calculate bounds
+  const gridNodeLayouts: Array<{
+    node: Node;
+    bounds: { width: number; height: number };
+    tempX: number;
+    tempY: number;
+  }> = [];
+  
+  gridNodes.forEach((rootNode) => {
+    const tempX = 0;  // Use origin as temporary position
+    const tempY = 0;
+    
+    // Set root node position at origin first
+    const rootIndex = newNodes.findIndex(n => n.id === rootNode.id);
+    if (rootIndex !== -1) {
+      newNodes[rootIndex] = { ...newNodes[rootIndex], x: tempX, y: tempY };
+    }
+    
+    // Recursively layout all children from bottom-up (deepest first)
+    newNodes = layoutChildrenInParent(rootNode.id, tempX, tempY, newNodes);
+    
+    // After all children are laid out, calculate the actual bounds
+    // Use getNodeBounds which calculates based on positioned children
+    const updatedRootNode = newNodes.find(n => n.id === rootNode.id);
+    if (!updatedRootNode) {
+      gridNodeLayouts.push({ node: rootNode, bounds: { width: 150, height: 80 }, tempX, tempY });
+      return;
+    }
+    
+    const bounds = getNodeBounds(updatedRootNode, newNodes);
+    
+    gridNodeLayouts.push({ node: rootNode, bounds, tempX, tempY });
+  });
+  
+  // Second pass: position grid nodes with proper spacing
+  // Calculate cumulative positions to avoid overlap
+  // Track Y position for each row
+  const rowYPositions = new Map<number, number>();
+  const rowMaxHeights = new Map<number, number>();
+  
+  // Pre-calculate max height for each row
+  gridNodeLayouts.forEach((layout, index) => {
+    const row = Math.floor(index / cols);
+    const currentMax = rowMaxHeights.get(row) || 0;
+    rowMaxHeights.set(row, Math.max(currentMax, layout.bounds.height));
+  });
+  
+  // Calculate Y position for each row (center of nodes)
+  let cumulativeY = cfg.startY;
+  rowMaxHeights.forEach((height, row) => {
+    if (row === 0) {
+      rowYPositions.set(row, cumulativeY + height / 2);
+    } else {
+      const prevHeight = rowMaxHeights.get(row - 1) || 0;
+      rowYPositions.set(row, cumulativeY + prevHeight / 2 + cfg.verticalSpacing + height / 2);
+      cumulativeY += prevHeight + cfg.verticalSpacing;
+    }
+  });
+  
+  gridNodeLayouts.forEach((layout, index) => {
     const row = Math.floor(index / cols);
     const col = index % cols;
     
-    // Calculate initial position for root
-    const tempX = rootNode.x || 0;
-    const tempY = rootNode.y || 0;
+    // Calculate column position (center of node)
+    // For each column: startX + sum of (previous widths + spacing) + current width/2
+    let currentX = cfg.startX;
     
-    // Layout children first at temp position
-    newNodes = layoutChildrenInParent(rootNode.id, tempX, tempY, newNodes);
+    // Add full widths of previous columns plus spacing
+    for (let c = 0; c < col; c++) {
+      const nodeInCol = gridNodeLayouts[row * cols + c];
+      if (nodeInCol) {
+        currentX += nodeInCol.bounds.width + cfg.horizontalSpacing;
+      }
+    }
     
-    // Now get actual bounds from child positions
-    const children = newNodes.filter(n => n.parentId === rootNode.id);
-    const bounds = children.length > 0 ? getBoundingBox(children, newNodes) : { width: 150, height: 80 };
+    // Add half width of current node to get its center
+    currentX += layout.bounds.width / 2;
     
-    // Calculate final grid position
-    const newX = cfg.startX + col * (bounds.width + cfg.horizontalSpacing);
-    const newY = cfg.startY + row * (bounds.height + cfg.verticalSpacing);
+    const newX = currentX;
+    const newY = rowYPositions.get(row) || cfg.startY;
     
     // Calculate delta to move from temp to final position
-    const deltaX = newX - tempX;
-    const deltaY = newY - tempY;
+    const deltaX = newX - layout.tempX;
+    const deltaY = newY - layout.tempY;
     
     // Update root node position
-    const nodeIndex = newNodes.findIndex(n => n.id === rootNode.id);
+    const nodeIndex = newNodes.findIndex(n => n.id === layout.node.id);
     if (nodeIndex !== -1) {
       newNodes[nodeIndex] = { ...newNodes[nodeIndex], x: newX, y: newY };
     }
@@ -270,7 +344,7 @@ export function autoLayoutNodes(nodes: Node[], diagram?: Diagram, config: Partia
         moveAllDescendants(desc.id);
       });
     };
-    moveAllDescendants(rootNode.id);
+    moveAllDescendants(layout.node.id);
   });
   
   // Now position port-connected nodes next to their ports
@@ -278,7 +352,14 @@ export function autoLayoutNodes(nodes: Node[], diagram?: Diagram, config: Partia
     const connection = portConnections.get(rootNode.id);
     if (!connection || !connection.port) return;
     
-    // Find the parent component that owns the port
+    // Store temp position at origin
+    const tempX = 0;
+    const tempY = 0;
+    
+    // Recursively layout all children from bottom-up first
+    newNodes = layoutChildrenInParent(rootNode.id, tempX, tempY, newNodes);
+    
+    // Find the parent component that owns the port (after grid nodes have been positioned)
     const portParentNode = newNodes.find(n => n.id === connection.portNodeId);
     if (!portParentNode) return;
     
@@ -334,13 +415,6 @@ export function autoLayoutNodes(nodes: Node[], diagram?: Diagram, config: Partia
         newX = portX - spacing;
         newY = portY;
     }
-    
-    // Store temp position
-    const tempX = rootNode.x || 0;
-    const tempY = rootNode.y || 0;
-    
-    // Layout children first at temp position
-    newNodes = layoutChildrenInParent(rootNode.id, tempX, tempY, newNodes);
     
     // Calculate delta to move from temp to final position
     const deltaX = newX - tempX;

@@ -1,38 +1,72 @@
 import type { Diagram, Node } from '../types';
-import type { RenderStack, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable, Renderable } from '../types/renderables';
+import type { RenderStack, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable, EdgeRenderable, Renderable } from '../types/renderables';
 
 // Helper to calculate node dimensions
-function getNodeDimensions(node: Node, allNodes: Node[]): { width: number; height: number } {
+// Helper to calculate node bounds
+function getNodeBounds(node: Node, allNodes: Node[]): { minX: number; maxX: number; minY: number; maxY: number } {
   const hasChildren = node.children && node.children.length > 0;
   
   if (!hasChildren) {
-    return { width: 150, height: 80 };
+    const width = 150;
+    const height = 80;
+    return {
+        minX: node.x - width / 2,
+        maxX: node.x + width / 2,
+        minY: node.y - height / 2,
+        maxY: node.y + height / 2
+    };
   }
   
   const childNodes = allNodes.filter(n => n.parentId === node.id);
   if (childNodes.length === 0) {
-    return { width: 150, height: 80 };
+    const width = 150;
+    const height = 80;
+    return {
+        minX: node.x - width / 2,
+        maxX: node.x + width / 2,
+        minY: node.y - height / 2,
+        maxY: node.y + height / 2
+    };
   }
-  
-  const sidePadding = 20;
-  const labelSpace = 35;
-  const verticalPadding = 20;
   
   let minX = Infinity, maxX = -Infinity;
   let minY = Infinity, maxY = -Infinity;
   
   childNodes.forEach(child => {
-    const childDims = getNodeDimensions(child, allNodes);
-    minX = Math.min(minX, child.x - childDims.width / 2);
-    maxX = Math.max(maxX, child.x + childDims.width / 2);
-    minY = Math.min(minY, child.y - childDims.height / 2);
-    maxY = Math.max(maxY, child.y + childDims.height / 2);
+    const childBounds = getNodeBounds(child, allNodes);
+    minX = Math.min(minX, childBounds.minX);
+    maxX = Math.max(maxX, childBounds.maxX);
+    minY = Math.min(minY, childBounds.minY);
+    maxY = Math.max(maxY, childBounds.maxY);
   });
   
-  const width = Math.max(200, (maxX - minX) + sidePadding * 2);
-  const height = Math.max(120, (maxY - minY) + verticalPadding * 2 + labelSpace);
+  // Add padding for parent
+  const sidePadding = 20;
+  const labelSpace = 35;
+  const verticalPadding = 20;
   
-  return { width, height };
+  return {
+    minX: minX - sidePadding,
+    maxX: maxX + sidePadding,
+    minY: minY - verticalPadding - labelSpace, // Extra space for label on top? Or symmetric?
+    // Label is usually top centered or middle. If container, label is top.
+    // Original logic: height = (maxY - minY) + verticalPadding * 2 + labelSpace
+    // Let's create symmetric padding around content, then add label space at top?
+    // Let's stick to simple padding expansion for now.
+    
+    // Actually, we want the rect to enclose children.
+    // X: minX - padding, maxX + padding.
+    // Y: minY - padding - labelSpace, maxY + padding.
+    
+    // Wait, previous logic:
+    // width = (maxX - minX) + sidePadding * 2
+    // height = (maxY - minY) + verticalPadding * 2 + labelSpace
+    
+    minX: minX - sidePadding,
+    maxX: maxX + sidePadding,
+    minY: minY - verticalPadding - labelSpace,
+    maxY: maxY + verticalPadding
+  };
 }
 
 // Build render stack from diagram data
@@ -49,7 +83,12 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
   const sortedNodes = [...diagram.nodes].sort((a, b) => (a.depth || 0) - (b.depth || 0));
   
   sortedNodes.forEach(node => {
-    const dims = getNodeDimensions(node, diagram.nodes);
+    const bounds = getNodeBounds(node, diagram.nodes);
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+    
     const hasChildren = node.children && node.children.length > 0;
     
     // Node rectangle
@@ -57,10 +96,10 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
       id: `rect-${node.id}`,
       type: 'rectangle',
       zIndex: zIndex++,
-      x: node.x,
-      y: node.y,
-      width: dims.width,
-      height: dims.height,
+      x: centerX, // Use calculated center
+      y: centerY, // Use calculated center
+      width: width,
+      height: height,
       fillColor: hasChildren ? 'transparent' : bgColor,
       strokeColor: borderColor,
       transparent: hasChildren,
@@ -75,8 +114,8 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
       id: `label-${node.id}`,
       type: 'text',
       zIndex: zIndex++,
-      x: node.x,
-      y: node.y - dims.height / 2 + 15,
+      x: centerX,
+      y: centerY - height / 2 + 15,
       content: node.label,
       fontSize: 14,
       color: textColor,
@@ -88,22 +127,22 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
     // Ports (from diagram.ports, not node.ports)
     const nodePorts = diagram.ports.filter(p => p.nodeId === node.id);
     nodePorts.forEach(port => {
-        let portX = node.x;
-        let portY = node.y;
+        let portX = centerX;
+        let portY = centerY;
         const portSize = 8;
         
         switch (port.side) {
           case 'left':
-            portX = node.x - dims.width / 2;
+            portX = centerX - width / 2;
             break;
           case 'right':
-            portX = node.x + dims.width / 2;
+            portX = centerX + width / 2;
             break;
           case 'top':
-            portY = node.y - dims.height / 2;
+            portY = centerY - height / 2;
             break;
           case 'bottom':
-            portY = node.y + dims.height / 2;
+            portY = centerY + height / 2;
             break;
         }
         
@@ -137,7 +176,111 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
     }
   });
   
-  // TODO: Add edge renderables
+  // Create a map of updated node bounds for edge routing
+  const nodeBounds = new Map<string, { x: number, y: number, width: number, height: number }>();
+  
+  stack.forEach(renderable => {
+    if (renderable.type === 'rectangle') {
+       const rect = renderable as RectangleRenderable;
+       nodeBounds.set(rect.nodeId || rect.id, {
+         x: rect.x,
+         y: rect.y,
+         width: rect.width,
+         height: rect.height
+       });
+    }
+  });
+
+  diagram.edges.forEach(edge => {
+    const sourceNode = nodeBounds.get(edge.from);
+    const targetNode = nodeBounds.get(edge.to); // or handle .port
+    
+    // We need to handle port connections too.
+    // If edge.fromPort is set, we need the port position.
+    
+    // Simple center-to-center for now? user says "connectors so not properly connect anymore to the parent border"
+    // This implies border intersection logic is needed.
+    
+    if (!sourceNode || !targetNode) return;
+    
+    const sourceX = sourceNode.x;
+    const sourceY = sourceNode.y;
+    const targetX = targetNode.x;
+    const targetY = targetNode.y;
+    
+    // Calculate intersection with source border
+    // Vector from source to target
+    const dx = targetX - sourceX;
+    const dy = targetY - sourceY;
+    
+    // A simple approximation for intersection with AABB is scaling the vector
+    // to the edge of the box.
+    // Box half sizes
+    const sw = sourceNode.width / 2;
+    const sh = sourceNode.height / 2;
+    
+    // Find intersection with source box (ray from center towards target)
+    // t_x = sw / abs(dx), t_y = sh / abs(dy)
+    // t = min(t_x, t_y)
+    let startX = sourceX;
+    let startY = sourceY;
+    
+    if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+        const tx = sw / (Math.abs(dx) || 0.0001);
+        const ty = sh / (Math.abs(dy) || 0.0001);
+        const t = Math.min(tx, ty);
+        startX += dx * t;
+        startY += dy * t;
+    }
+
+    // Intersection with target box (ray from target to source)
+    const tw = targetNode.width / 2;
+    const th = targetNode.height / 2;
+    
+    const dx2 = sourceX - targetX;
+    const dy2 = sourceY - targetY;
+    
+    let endX = targetX;
+    let endY = targetY;
+    
+    if (Math.abs(dx2) > 0 || Math.abs(dy2) > 0) {
+        const tx2 = tw / (Math.abs(dx2) || 0.0001);
+        const ty2 = th / (Math.abs(dy2) || 0.0001);
+        const t2 = Math.min(tx2, ty2);
+        endX += dx2 * t2;
+        endY += dy2 * t2;
+    }
+
+    // Create renderable
+    const edgeRenderable: EdgeRenderable = {
+        id: `edge-${edge.id || i}`, // Edge might not have ID, use index as fallback
+        type: 'edge', // Renderable type
+        zIndex: zIndex++, // Edges on top? Or below nodes? Usually below nodes but zIndex increment means on top.
+                     // If we want below, we should have processed edges first.
+                     // But typically connectors are on top of background but below text?
+                     // Let's keep strict zIndex order for now.
+        x: 0, // Base x/y not used for edges usually, points are absolute
+        y: 0,
+        points: [[startX, startY], [endX, endY]],
+        color: borderColor,
+        lineWidth: 1, // Standard line width
+        label: edge.label,
+        labelColor: textColor
+    };
+    
+    // Customize based on edge type
+    if (edge.type === 'delegate') {
+        edgeRenderable.dashed = true;
+        edgeRenderable.dashSize = 5;
+    } else if (edge.type === 'interface') {
+        // -())- connector
+        // We need symbol config
+        edgeRenderable.symbolLeft = 'ball'; // Simplify for now
+        edgeRenderable.symbolColor = textColor;
+    }
+    
+    stack.push(edgeRenderable);
+  });
   
   return stack;
 }

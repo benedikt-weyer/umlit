@@ -115,6 +115,8 @@ export const useStore = create<AppState>((set) => ({
       const lines = newCode.split('\n');
       const newLines = lines.map(line => {
         const trimmed = line.trim();
+        const indentMatch = line.match(/^\s*/);
+        const indent = indentMatch ? indentMatch[0] : '';
         
         // Check each moved node
         for (const nodeId of nodesToUpdate) {
@@ -124,9 +126,10 @@ export const useStore = create<AppState>((set) => ({
             if (updatedNode) {
               // Check if it already has coordinates
               if (trimmed.includes('@')) {
-                return trimmed.replace(/@\s*-?\d+,\s*-?\d+/, `@ ${updatedNode.x},${updatedNode.y}`);
+                const updated = trimmed.replace(/@\s*-?\d+,\s*-?\d+/, `@ ${updatedNode.x},${updatedNode.y}`);
+                return `${indent}${updated}`;
               } else {
-                return `${trimmed} @ ${updatedNode.x},${updatedNode.y}`;
+                return `${indent}${trimmed} @ ${updatedNode.x},${updatedNode.y}`;
               }
             }
           }

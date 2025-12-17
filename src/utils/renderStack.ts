@@ -176,37 +176,43 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
     }
   });
   
-  // Create a map of updated node bounds for edge routing
-  const nodeBounds = new Map<string, { x: number, y: number, width: number, height: number }>();
+  // Create a map of updated node/port bounds for edge routing
+  const elementBounds = new Map<string, { x: number, y: number, width: number, height: number }>();
   
   stack.forEach(renderable => {
     if (renderable.type === 'rectangle') {
        const rect = renderable as RectangleRenderable;
-       nodeBounds.set(rect.nodeId || rect.id, {
+       elementBounds.set(rect.nodeId || rect.id, {
          x: rect.x,
          y: rect.y,
          width: rect.width,
          height: rect.height
        });
+    } else if (renderable.type === 'port') {
+        const port = renderable as PortRenderable;
+        elementBounds.set(port.portId, {
+            x: port.x,
+            y: port.y,
+            width: port.size,
+            height: port.size
+        });
     }
   });
 
   diagram.connectors.forEach((connector, i) => {
-    const sourceNode = nodeBounds.get(connector.source);
-    const targetNode = nodeBounds.get(connector.target); // or handle .port
+    // Determine lookup keys: use port ID if available, otherwise node ID
+    const sourceKey = connector.sourcePort || connector.source;
+    const targetKey = connector.targetPort || connector.target;
     
-    // We need to handle port connections too.
-    // If connector.sourcePort is set, we need the port position.
+    const source = elementBounds.get(sourceKey);
+    const target = elementBounds.get(targetKey);
     
-    // Simple center-to-center for now? user says "connectors so not properly connect anymore to the parent border"
-    // This implies border intersection logic is needed.
+    if (!source || !target) return;
     
-    if (!sourceNode || !targetNode) return;
-    
-    const sourceX = sourceNode.x;
-    const sourceY = sourceNode.y;
-    const targetX = targetNode.x;
-    const targetY = targetNode.y;
+    const sourceX = source.x;
+    const sourceY = source.y;
+    const targetX = target.x;
+    const targetY = target.y;
     
     // Calculate intersection with source border
     // Vector from source to target
@@ -216,8 +222,8 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
     // A simple approximation for intersection with AABB is scaling the vector
     // to the edge of the box.
     // Box half sizes
-    const sw = sourceNode.width / 2;
-    const sh = sourceNode.height / 2;
+    const sw = source.width / 2;
+    const sh = source.height / 2;
     
     // Find intersection with source box (ray from center towards target)
     // t_x = sw / abs(dx), t_y = sh / abs(dy)
@@ -234,8 +240,8 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
     }
 
     // Intersection with target box (ray from target to source)
-    const tw = targetNode.width / 2;
-    const th = targetNode.height / 2;
+    const tw = target.width / 2;
+    const th = target.height / 2;
     
     const dx2 = sourceX - targetX;
     const dy2 = sourceY - targetY;
@@ -267,8 +273,14 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
     
     // Customize based on connector type
     if (connector.isDelegate || (connector.stereotype === 'delegate')) {
+        let finalLabel = baseConn.label || '';
+        if (!finalLabel.includes('<<delegate>>')) {
+            finalLabel = finalLabel ? `<<delegate>> ${finalLabel}` : '<<delegate>>';
+        }
+
         const delegateConn: DelegateConnectorRenderable = {
             ...baseConn,
+            label: finalLabel,
             connectorType: 'delegate',
             dashed: true,
             dashSize: 5,

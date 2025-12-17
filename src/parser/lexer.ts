@@ -16,6 +16,7 @@ export enum TokenType {
   NUMBER = 'NUMBER',
   STRING = 'STRING', // For labels that might contain spaces if quoted, or just text
   NEWLINE = 'NEWLINE',
+  WHITESPACE = 'WHITESPACE',
   EOF = 'EOF'
 }
 
@@ -36,23 +37,43 @@ export class Lexer {
     this.input = input;
   }
 
-  tokenize(): Token[] {
+  tokenize(options: { includeWhitespace?: boolean } = {}): Token[] {
     const tokens: Token[] = [];
-    let token = this.nextToken();
+    let token = this.nextToken(options.includeWhitespace);
 
     while (token.type !== TokenType.EOF) {
-      if (token.type !== TokenType.NEWLINE) { // Optional: skip newlines if not needed by parser, but keeping them might be useful
-         // For now, let's include NEWLINEs because the current parser relies on line separation
-      }
+      // If includeWhitespace is true, everything is included (except maybe Newlines if filtered? No, usually include all)
+      // Original logic:
+      // if (token.type !== TokenType.NEWLINE) { ... }
+      
+      // If we are highlighting, we need ALL tokens including Newlines and Whitespace.
+      // If we are parsing, we usually skip whitespace (Lexer default behavior was skipping in nextToken).
+      
+      // If using default (parsing), nextToken skips whitespace.
+      // But tokenize loop filters NEWLINE?
+      // "if (token.type !== TokenType.NEWLINE) ... // For now, let's include NEWLINEs" -> code commented out logic implies logic includes NEWLINEs.
+      
       tokens.push(token);
-      token = this.nextToken();
+      token = this.nextToken(options.includeWhitespace);
     }
     tokens.push(token); // Push EOF
     return tokens;
   }
 
-  private nextToken(): Token {
-    this.skipWhitespace();
+  private nextToken(includeWhitespace: boolean = false): Token {
+    if (!includeWhitespace) {
+        this.skipWhitespace();
+    } else {
+        // Build whitespace token if current char is whitespace
+        if (this.isWhitespace(this.peek()) && this.peek() !== '\n') {
+            let value = '';
+            while (this.position < this.input.length && this.isWhitespace(this.peek()) && this.peek() !== '\n') {
+                value += this.input[this.position];
+                this.advance();
+            }
+            return this.createToken(TokenType.WHITESPACE, value);
+        }
+    }
 
     if (this.position >= this.input.length) {
       return this.createToken(TokenType.EOF, '');
@@ -229,5 +250,9 @@ export class Lexer {
 
   private isDigit(char: string): boolean {
     return /[0-9]/.test(char);
+  }
+
+  private isWhitespace(char: string): boolean {
+    return char === ' ' || char === '\t' || char === '\r';
   }
 }

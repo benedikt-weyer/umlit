@@ -1,60 +1,142 @@
-import React from 'react';
-import CodeMirror from '@uiw/react-codemirror';
-import { javascript } from '@codemirror/lang-javascript';
-import { linter, type Diagnostic } from '@codemirror/lint';
+import React, { useRef, useMemo } from 'react';
 import { useStore } from '../store';
 import { useTheme } from './ThemeContextProvider';
-import { ParserError } from '../parser/astParser';
+import { cn } from '@/lib/utils';
+import { Lexer, TokenType, type Token } from '../parser/lexer';
+
+const getTokenColor = (type: TokenType, theme: 'light' | 'dark'): string => {
+  const isDark = theme === 'dark';
+  
+  switch (type) {
+    case TokenType.KEYWORD_PORT:
+    case TokenType.KEYWORD_ON:
+      return isDark ? '#569cd6' : '#0000ff'; // Blue
+    case TokenType.SIDE:
+      return isDark ? '#c586c0' : '#af00db'; // Purple
+    case TokenType.LBRACKET:
+    case TokenType.RBRACKET:
+    case TokenType.LBRACE:
+    case TokenType.RBRACE:
+    case TokenType.AT:
+    case TokenType.COMMA:
+    case TokenType.COLON:
+      return isDark ? '#d4d4d4' : '#000000'; // Standard text
+    case TokenType.ARROW:
+    case TokenType.DELEGATE_ARROW:
+    case TokenType.INTERFACE_CONNECTOR:
+      return isDark ? '#dcdcaa' : '#795e26'; // Yellow/Gold
+    case TokenType.NUMBER:
+      return isDark ? '#b5cea8' : '#098658'; // Green
+    case TokenType.IDENTIFIER:
+      return isDark ? '#9cdcfe' : '#001080'; // Light Blue / Navy
+    case TokenType.STRING:
+      return isDark ? '#ce9178' : '#a31515'; // Red/Brownish
+    case TokenType.NEWLINE:
+    case TokenType.WHITESPACE:
+    case TokenType.EOF:
+      return 'transparent';
+    default:
+      return 'inherit';
+  }
+};
 
 export const SourceCodeEditor: React.FC = () => {
   const { code, setCode, error } = useStore();
   const { theme } = useTheme();
-
-  const handleChange = React.useCallback((value: string) => {
-    setCode(value);
-  }, [setCode]);
-
-  const errorExtension = React.useMemo(() => {
-    return linter((view) => {
-      if (!error || !(error instanceof ParserError)) return [];
-      
-      try {
-          // Verify line exists
-          if (error.line > view.state.doc.lines) return [];
-          
-          const lineObj = view.state.doc.line(error.line);
-          // Highlight from column to end of word or line
-          // ParserError column is 1-based start of token
-          const from = Math.min(lineObj.from + error.column - 1, lineObj.to);
-          const to = lineObj.to; // For now highlight rest of line
-          
-          const diagnostic: Diagnostic = {
-            from,
-            to: Math.max(from + 1, to), // Ensure at least 1 char
-            severity: 'error',
-            message: error.message,
-          };
-          return [diagnostic];
-      } catch (e) {
-          return [];
+  
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const preRef = useRef<HTMLPreElement>(null);
+  const lineNumbersRef = useRef<HTMLDivElement>(null);
+  
+  const handleScroll = () => {
+    if (textareaRef.current) {
+      const { scrollTop, scrollLeft } = textareaRef.current;
+      if (lineNumbersRef.current) {
+        lineNumbersRef.current.scrollTop = scrollTop;
       }
-    });
-  }, [error]);
+      if (preRef.current) {
+        preRef.current.scrollTop = scrollTop;
+        preRef.current.scrollLeft = scrollLeft;
+      }
+    }
+  };
+
+  const lines = code.split('\n');
+  const lineCount = lines.length;
+
+  // Tokenize for highlighting
+  const tokens = useMemo(() => {
+    try {
+        const lexer = new Lexer(code);
+        return lexer.tokenize({ includeWhitespace: true });
+    } catch (e) {
+        return [];
+    }
+  }, [code]);
 
   return (
-    <div className="h-full w-full bg-background flex flex-col">
-      <div className="flex-1 overflow-hidden">
-        <CodeMirror
-          value={code}
-          height="100%"
-          theme={theme === 'dark' ? 'dark' : 'light'}
-          extensions={[javascript(), errorExtension]}
-          onChange={handleChange}
-          className="h-full text-base"
-        />
+    <div className={cn(
+      "flex flex-col h-full border-r",
+      theme === 'dark' ? "bg-[#1e1e1e]" : "bg-white"
+    )}>
+      <div className="flex-1 relative flex overflow-hidden">
+        {/* Line Numbers */}
+        <div 
+          ref={lineNumbersRef}
+          className={cn(
+            "w-12 text-right pr-3 select-none overflow-hidden py-4 font-mono text-[14px] leading-[21px]",
+            theme === 'dark' ? "bg-[#1e1e1e] text-[#858585]" : "bg-[#f0f0f0] text-[#858585] border-r"
+          )}
+        >
+          {Array.from({ length: lineCount }, (_, i) => (
+            <div key={i + 1} className="h-[21px]">{i + 1}</div>
+          ))}
+        </div>
+        
+        {/* Editor Container */}
+        <div className="flex-1 relative overflow-hidden">
+             {/* Highlight Overlay */}
+            <pre
+              ref={preRef}
+              className={cn(
+                 "absolute inset-0 m-0 p-0 pl-3 py-4 font-mono text-[14px] leading-[21px] whitespace-pre pointer-events-none overflow-hidden",
+                 theme === 'dark' ? "text-[#d4d4d4]" : "text-black"
+              )}
+              style={{
+                fontFamily: 'monospace',
+              }}
+              aria-hidden="true"
+            >
+              {tokens.map((token, i) => (
+                <span key={i} style={{ color: getTokenColor(token.type, theme as 'light'|'dark') }}>
+                  {token.value}
+                </span>
+              ))}
+            </pre>
+
+            {/* Transparent Textarea for Input */}
+            <textarea
+              ref={textareaRef}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onScroll={handleScroll}
+              className={cn(
+                "absolute inset-0 w-full h-full resize-none border-none outline-none p-0 pl-3 py-4 font-mono text-[14px] leading-[21px] whitespace-pre overflow-auto",
+                "bg-transparent text-transparent caret-foreground focus:ring-0"
+              )}
+              spellCheck={false}
+              style={{
+                fontFamily: 'monospace',
+                color: 'transparent',
+                caretColor: theme === 'dark' ? 'white' : 'black'
+              }}
+            />
+        </div>
       </div>
+
+      {/* Error Message */}
       {error && (
-        <div className="bg-destructive/10 text-destructive p-2 text-sm border-t border-destructive/20 font-mono">
+        <div className="bg-destructive/10 text-destructive p-2 text-sm border-t border-destructive/20 font-mono z-10 relative">
           {error.message}
         </div>
       )}

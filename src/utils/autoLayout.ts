@@ -81,7 +81,7 @@ function layoutChildrenInParent(parentId: string, parentX: number, parentY: numb
   if (children.length === 0) return nodes;
   
   let newNodes = [...nodes];
-  const childSpacing = 30;
+  const childSpacing = 120; // Generous spacing between child elements
   
   // Just position children in a simple stack - parent will size around them
   let currentY = parentY;

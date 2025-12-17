@@ -47,20 +47,46 @@ export interface BookIconRenderable extends BaseRenderable {
   strokeColor: string;
 }
 
-export interface ConnectorRenderable extends BaseRenderable {
+export type ConnectorRenderable = 
+  | SimpleConnectorRenderable 
+  | DelegateConnectorRenderable 
+  | InterfaceConnectorRenderable;
+
+export interface BaseConnectorRenderable extends BaseRenderable {
   type: 'connector';
-  points: [number, number][];
+  points: [number, number][]; // Start and End points usually
   color: string;
   lineWidth: number;
-  dashed?: boolean;
-  dashSize?: number;
-  gapSize?: number;
-  symbolLeft?: 'ball' | 'socket-left' | 'socket-right' | 'arrow';
-  symbolRight?: 'ball' | 'socket-left' | 'socket-right' | 'arrow';
-  symbolColor?: string;
-  symbolBgColor?: string;
   label?: string;
   labelColor?: string;
+}
+
+export interface SimpleConnectorRenderable extends BaseConnectorRenderable {
+  connectorType: 'simple';
+  symbolStart?: 'arrow' | 'none'; // Standard arrows
+  symbolEnd?: 'arrow' | 'none';
+}
+
+export interface DelegateConnectorRenderable extends BaseConnectorRenderable {
+  connectorType: 'delegate';
+  dashed: boolean;
+  dashSize?: number;
+  symbolEnd?: 'arrow';
+}
+
+export interface InterfaceConnectorRenderable extends BaseConnectorRenderable {
+  connectorType: 'interface';
+  // "Ball" is provider, "Socket" is requirer
+  providerSymbol?: 'ball';
+  requirerSymbol?: 'socket'; 
+  // We need to know which end has which.
+  // Actually, let's keep it abstract:
+  // e.g. "symbolStart" and "symbolEnd" but typed?
+  // Or better:
+  startSymbol?: 'ball' | 'socket-left' | 'socket-right'; 
+  endSymbol?: 'ball' | 'socket-left' | 'socket-right';
+  symbolColor?: string;
+  symbolBgColor?: string;
 }
 
 export type Renderable = 

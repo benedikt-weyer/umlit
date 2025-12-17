@@ -5,6 +5,7 @@ import { useTheme } from '../ThemeContextProvider';
 import { buildRenderStack } from '../../utils/renderStack';
 import { Renderer } from './Renderer';
 import { generateSVG, downloadStringAsFile } from '../../utils/export';
+import { flattenToAtomicStack } from '../../utils/atomicStack';
 
 export const Visualizer: React.FC = () => {
   const diagram = useStore((state) => state.diagram);
@@ -20,6 +21,11 @@ export const Visualizer: React.FC = () => {
   const renderStack = useMemo(() => {
     return buildRenderStack(diagram, theme);
   }, [diagram, theme]);
+
+  // Build atomic render stack
+  const atomicRenderStack = useMemo(() => {
+    return flattenToAtomicStack(renderStack);
+  }, [renderStack]);
 
   const handleNodeDrag = (nodeId: string, x: number, y: number) => {
     updateNodePosition(nodeId, x, y);
@@ -124,7 +130,7 @@ export const Visualizer: React.FC = () => {
         <Layer>
           
           {/* Render everything from the stack */}
-          <Renderer renderStack={renderStack} onNodeDrag={handleNodeDrag} />
+          <Renderer atomicRenderStack={atomicRenderStack} onNodeDrag={handleNodeDrag} />
         </Layer>
       </Stage>
     </div>

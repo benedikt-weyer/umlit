@@ -1,5 +1,5 @@
 import type { Diagram, Node } from '../types';
-import type { RenderStack, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable, ConnectorRenderable, Renderable } from '../types/renderables';
+import type { RenderStack, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable, ConnectorRenderable, Renderable, SimpleConnectorRenderable, DelegateConnectorRenderable, InterfaceConnectorRenderable } from '../types/renderables';
 
 // Helper to calculate node dimensions
 // Helper to calculate node bounds
@@ -251,64 +251,73 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
         endY += dy2 * t2;
     }
 
-    // Create renderable
-    const connectorRenderable: ConnectorRenderable = {
-        id: `conn-${connector.id || i}`, // Connector might not have ID, use index as fallback
-        type: 'connector', // Renderable type
+    // Create base renderable properties
+    const baseConn = {
+        id: `conn-${connector.id || i}`,
+        type: 'connector' as const,
         zIndex: zIndex++, 
         x: 0, 
         y: 0,
-        points: [[startX, startY], [endX, endY]],
+        points: [[startX, startY], [endX, endY]] as [number, number][],
         color: borderColor,
-        lineWidth: 1, // Standard line width
+        lineWidth: 1,
         label: connector.label,
         labelColor: textColor
     };
     
     // Customize based on connector type
     if (connector.isDelegate || (connector.stereotype === 'delegate')) {
-        connectorRenderable.dashed = true;
-        connectorRenderable.dashSize = 5;
-        connectorRenderable.symbolRight = 'arrow';
-    } else if (connector.type && connector.type.includes('>')) {
-        // Standard arrow ->
-        connectorRenderable.symbolRight = 'arrow';
+        const delegateConn: DelegateConnectorRenderable = {
+            ...baseConn,
+            connectorType: 'delegate',
+            dashed: true,
+            dashSize: 5,
+            symbolEnd: 'arrow'
+        };
+        stack.push(delegateConn);
     } else if (connector.type && (connector.type.includes('(') || connector.type.includes(')'))) {
         // Interface connectors e.g., -())-
-        // Logic: look for () or )( patterns
-        // -())- : Lollipop (ball) on left, Socket on right?
-        // Actually usually: 
-        // A --() B : A provides, B requires (B has socket, A has ball?)
-        // Let's stick to visual representation for now based on string
-        
+        const interfaceConn: InterfaceConnectorRenderable = {
+            ...baseConn,
+            connectorType: 'interface',
+            symbolColor: textColor,
+            symbolBgColor: theme === 'dark' ? '#000000' : '#ffffff'
+        };
+
         const type = connector.type;
         
         // Left Symbol
         if (type.startsWith('-()')) {
-            connectorRenderable.symbolLeft = 'ball';
+            interfaceConn.startSymbol = 'ball';
         } else if (type.startsWith('-(')) {
-            // Want '('. At Left, rotation is 180.
-            // Need symbol that flips to '('. That is ')'.
-            // ')' is 'socket-left'.
-            connectorRenderable.symbolLeft = 'socket-left'; 
+            interfaceConn.startSymbol = 'socket-left'; 
         } else if (type.startsWith('-)')) {
-            // Want ')'. Flip of '('.
-            connectorRenderable.symbolLeft = 'socket-right';
+            interfaceConn.startSymbol = 'socket-right';
         }
         
         // Right Symbol
         if (type.endsWith('()-')) {
-             connectorRenderable.symbolRight = 'ball';
+             interfaceConn.endSymbol = 'ball';
         } else if (type.endsWith(')-')) {
-             // Want ')'. No flip.
-             connectorRenderable.symbolRight = 'socket-left'; 
+             interfaceConn.endSymbol = 'socket-left'; 
         } else if (type.endsWith('(-')) {
-             // Want '('. No flip.
-             connectorRenderable.symbolRight = 'socket-right';
+             interfaceConn.endSymbol = 'socket-right';
         }
+        
+        stack.push(interfaceConn);
+    } else {
+        // Default Simple Connector
+        const simpleConn: SimpleConnectorRenderable = {
+            ...baseConn,
+            connectorType: 'simple'
+        };
+        
+        if (connector.type && connector.type.includes('>')) {
+            simpleConn.symbolEnd = 'arrow';
+        }
+        
+        stack.push(simpleConn);
     }
-    
-    stack.push(connectorRenderable);
   });
   
   return stack;

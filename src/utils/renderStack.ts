@@ -75,7 +75,8 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
   let zIndex = 0;
   
   const bgColor = theme === 'dark' ? '#1f1f1f' : '#ffffff';
-  const borderColor = theme === 'dark' ? '#666666' : '#cccccc';
+  const borderColor = theme === 'dark' ? '#ffffff' : '#000000'; // White in dark mode, black in light mode
+  const bookBorderColor = theme === 'dark' ? '#666666' : '#cccccc'; // Subtle gray for book icons
   const textColor = theme === 'dark' ? '#ffffff' : '#000000';
   const portColor = bgColor; // Ports use same color as normal components
   
@@ -170,7 +171,7 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
         x: node.x + 57,
         y: node.y,
         color: textColor,
-        strokeColor: borderColor
+        strokeColor: bookBorderColor // Use subtle border for book icons
       };
       stack.push(bookIconRenderable);
     }

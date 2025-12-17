@@ -1,7 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Stage, Layer } from 'react-konva';
 import { useStore } from '../../store';
-import { Edge } from './Edge';
 import { useTheme } from '../ThemeContextProvider';
 import { buildRenderStack } from '../../utils/renderStack';
 import { Renderer } from './Renderer';
@@ -123,10 +122,6 @@ export const Visualizer: React.FC = () => {
         style={{ backgroundColor: bgColor }}
       >
         <Layer>
-          {/* Render edges */}
-          {diagram.edges.map((edge) => (
-            <Edge key={edge.id} {...edge} />
-          ))}
           
           {/* Render everything from the stack */}
           <Renderer renderStack={renderStack} onNodeDrag={handleNodeDrag} />

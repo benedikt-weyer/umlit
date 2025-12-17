@@ -27,22 +27,21 @@ export interface ASTNode {
   ports: ASTPort[];
 }
 
-export interface ASTEdge {
+export interface ASTConnector {
   id: string;
   sourceNodeId: string;
   targetNodeId: string;
   sourcePortId?: string;
   targetPortId?: string;
   label?: string;
-  edgeType?: string; // e.g., "-())-" for ball-and-socket
   isDelegate?: boolean;
-  stereotype?: string; // e.g., "delegate"
+  stereotype?: string;
+  edgeType?: string; // KEEP element type for now? or rename to connectorType?
 }
 
 export interface DiagramAST {
   type: DiagramType;
   rootNodes: ASTNode[]; // Top-level nodes only
-  edges: ASTEdge[]; // All edges (flat list)
-  tokens?: Token[];
+  connectors: ASTConnector[]; // All edges (flat list)
+  tokens?: any[];
 }
-```

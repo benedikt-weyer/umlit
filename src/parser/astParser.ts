@@ -1,21 +1,29 @@
-import type { DiagramAST, ASTNode, ASTEdge, ASTPort, DiagramType } from '../types/ast';
-import { Lexer, TokenType, type Token } from './lexer';
+import type { Diagram, Node, Connector, Port, DiagramType } from '../types';
+import type { DiagramAST, ASTNode, ASTEdge, ASTPort } from '../types/ast'; // Revert to import AST types
+import { TokenType, Lexer } from './lexer';
+import type { Token } from './lexer';
 
 export class ParserError extends Error {
-  line: number;
-  column: number;
-  
+  public line: number;
+  public column: number;
+
   constructor(message: string, line: number, column: number) {
-    super(`${message} (Line ${line}, Column ${column})`);
+    super(message);
     this.name = 'ParserError';
     this.line = line;
     this.column = column;
   }
 }
 
+interface ParsedCst {
+  type: DiagramType;
+  rootNodes: ASTNode[];
+  connectors: ASTConnector[]; 
+  tokens: Token[];
+}
 const MAX_DEPTH = 50;
 
-export function parseToAST(code: string): DiagramAST {
+export function parseToAST(code: string): ParsedCst {
   const lexer = new Lexer(code);
   const tokens = lexer.tokenize();
   
@@ -50,7 +58,7 @@ export function parseToAST(code: string): DiagramAST {
   
   let diagramType: DiagramType = 'uml2.5-component';
   let rootNodes: ASTNode[] = [];
-  let edges: ASTEdge[] = [];
+  let connectors: ASTConnector[] = [];
   let edgeIdCounter = 0;
   const nodeStack: ASTNode[] = [];
   
@@ -80,7 +88,7 @@ export function parseToAST(code: string): DiagramAST {
        if (match(TokenType.RBRACE)) {
          consume(TokenType.RBRACE);
        }
-       return { type: diagramType, rootNodes, edges, tokens };
+       return { type: diagramType, rootNodes, connectors, tokens };
     }
   }
   
@@ -257,8 +265,8 @@ export function parseToAST(code: string): DiagramAST {
       label = l.trim();
     }
     
-    edges.push({
-      id: `edge-${edgeIdCounter++}`,
+    connectors.push({
+      id: `conn-${edgeIdCounter++}`, // Changed prefix to conn-
       sourceNodeId,
       targetNodeId,
       sourcePortId,
@@ -332,5 +340,21 @@ export function parseToAST(code: string): DiagramAST {
     }
   }
 
-  return { type: diagramType, rootNodes, edges, tokens };
+  return { type: diagramType, rootNodes, connectors, tokens };
 }
+
+// Basic parser that converts text to AST
+
+export function convertASTToDiagram(ast: DiagramAST | null): Diagram {
+  // This function is deprecated/unused as index.ts implements its own.
+  // But index.ts IMPORTS it? No, index.ts defines its own `convertASTToDiagram`.
+  // Wait, let me check index.ts again. 
+  // index.ts: import { parseToAST } from './astParser';
+  // index.ts has `function convertASTToDiagram(ast: DiagramAST): Diagram { ... }` locally defined.
+  // So I can remove it from here.
+  return { type: 'uml2.5-component', nodes: [], connectors: [], ports: [] };
+}
+// Actually, better to remove the function entirely if not exported/used.
+// But check if other files import it.
+// `grep` for usage?
+

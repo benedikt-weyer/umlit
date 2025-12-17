@@ -26,9 +26,10 @@ export function generateSVG(diagram: Diagram): string {
   svg += `<rect x="${minX - padding}" y="${minY - padding}" width="${width}" height="${height}" fill="#f9fafb" />`;
 
   // Edges
-  diagram.edges.forEach(edge => {
-    const source = diagram.nodes.find(n => n.id === edge.source);
-    const target = diagram.nodes.find(n => n.id === edge.target);
+  // Connectors
+  diagram.connectors.forEach(connector => {
+    const source = diagram.nodes.find(n => n.id === connector.source);
+    const target = diagram.nodes.find(n => n.id === connector.target);
     if (source && target) {
       const x1 = source.x;
       const y1 = -source.y;
@@ -38,8 +39,10 @@ export function generateSVG(diagram: Diagram): string {
       // Line
       svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="black" stroke-width="2" />`;
       
-      // Lollipop Circle
-      svg += `<circle cx="${x2}" cy="${y2}" r="5" fill="white" stroke="black" stroke-width="1" />`;
+      // Lollipop Circle (if interface)
+      if (connector.type && connector.type.includes(')')) {
+          svg += `<circle cx="${x2}" cy="${y2}" r="5" fill="white" stroke="black" stroke-width="1" />`;
+      }
     }
   });
 

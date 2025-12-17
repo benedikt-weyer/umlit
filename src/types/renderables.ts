@@ -1,7 +1,7 @@
 // Flat, absolute-positioned draw instructions
 // These are NOT tree objects - they are simple draw commands
 
-export type RenderableType = 'rectangle' | 'text' | 'port' | 'book-icon' | 'edge';
+export type RenderableType = 'rectangle' | 'text' | 'port' | 'book-icon' | 'connector';
 
 interface BaseRenderable {
   id: string;
@@ -47,16 +47,16 @@ export interface BookIconRenderable extends BaseRenderable {
   strokeColor: string;
 }
 
-export interface EdgeRenderable extends BaseRenderable {
-  type: 'edge';
+export interface ConnectorRenderable extends BaseRenderable {
+  type: 'connector';
   points: [number, number][];
   color: string;
   lineWidth: number;
   dashed?: boolean;
   dashSize?: number;
   gapSize?: number;
-  symbolLeft?: 'ball' | 'socket-left' | 'socket-right';
-  symbolRight?: 'ball' | 'socket-left' | 'socket-right';
+  symbolLeft?: 'ball' | 'socket-left' | 'socket-right' | 'arrow';
+  symbolRight?: 'ball' | 'socket-left' | 'socket-right' | 'arrow';
   symbolColor?: string;
   symbolBgColor?: string;
   label?: string;
@@ -68,6 +68,6 @@ export type Renderable =
   | TextRenderable
   | PortRenderable
   | BookIconRenderable
-  | EdgeRenderable;
+  | ConnectorRenderable;
 
 export type RenderStack = Renderable[];

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { parseDiagram } from './parser';
-import type { Diagram, Node, Edge, Port } from './types';
+import type { Diagram, Node, Port } from './types';
 import type { DiagramAST } from './types/ast';
 import type { Token } from './parser/lexer';
 import { autoLayoutNodes, updateCodeWithPositions } from './utils/autoLayout';

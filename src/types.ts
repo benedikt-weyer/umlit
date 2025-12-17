@@ -26,7 +26,7 @@ export interface Node {
   ports?: Port[]; // Ports for communication
 }
 
-export interface Edge {
+export interface Connector {
   id: string;
   source: string;
   target: string;
@@ -41,6 +41,6 @@ export interface Edge {
 export interface Diagram {
   type: DiagramType;
   nodes: Node[];
-  edges: Edge[];
+  connectors: Connector[];
   ports: Port[];
 }

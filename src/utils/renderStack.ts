@@ -1,5 +1,5 @@
 import type { Diagram, Node } from '../types';
-import type { RenderStack, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable, EdgeRenderable, Renderable } from '../types/renderables';
+import type { RenderStack, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable, ConnectorRenderable, Renderable } from '../types/renderables';
 
 // Helper to calculate node dimensions
 // Helper to calculate node bounds
@@ -191,12 +191,12 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
     }
   });
 
-  diagram.edges.forEach(edge => {
-    const sourceNode = nodeBounds.get(edge.from);
-    const targetNode = nodeBounds.get(edge.to); // or handle .port
+  diagram.connectors.forEach((connector, i) => {
+    const sourceNode = nodeBounds.get(connector.source);
+    const targetNode = nodeBounds.get(connector.target); // or handle .port
     
     // We need to handle port connections too.
-    // If edge.fromPort is set, we need the port position.
+    // If connector.sourcePort is set, we need the port position.
     
     // Simple center-to-center for now? user says "connectors so not properly connect anymore to the parent border"
     // This implies border intersection logic is needed.
@@ -252,34 +252,63 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
     }
 
     // Create renderable
-    const edgeRenderable: EdgeRenderable = {
-        id: `edge-${edge.id || i}`, // Edge might not have ID, use index as fallback
-        type: 'edge', // Renderable type
-        zIndex: zIndex++, // Edges on top? Or below nodes? Usually below nodes but zIndex increment means on top.
-                     // If we want below, we should have processed edges first.
-                     // But typically connectors are on top of background but below text?
-                     // Let's keep strict zIndex order for now.
-        x: 0, // Base x/y not used for edges usually, points are absolute
+    const connectorRenderable: ConnectorRenderable = {
+        id: `conn-${connector.id || i}`, // Connector might not have ID, use index as fallback
+        type: 'connector', // Renderable type
+        zIndex: zIndex++, 
+        x: 0, 
         y: 0,
         points: [[startX, startY], [endX, endY]],
         color: borderColor,
         lineWidth: 1, // Standard line width
-        label: edge.label,
+        label: connector.label,
         labelColor: textColor
     };
     
-    // Customize based on edge type
-    if (edge.type === 'delegate') {
-        edgeRenderable.dashed = true;
-        edgeRenderable.dashSize = 5;
-    } else if (edge.type === 'interface') {
-        // -())- connector
-        // We need symbol config
-        edgeRenderable.symbolLeft = 'ball'; // Simplify for now
-        edgeRenderable.symbolColor = textColor;
+    // Customize based on connector type
+    if (connector.isDelegate || (connector.stereotype === 'delegate')) {
+        connectorRenderable.dashed = true;
+        connectorRenderable.dashSize = 5;
+        connectorRenderable.symbolRight = 'arrow';
+    } else if (connector.type && connector.type.includes('>')) {
+        // Standard arrow ->
+        connectorRenderable.symbolRight = 'arrow';
+    } else if (connector.type && (connector.type.includes('(') || connector.type.includes(')'))) {
+        // Interface connectors e.g., -())-
+        // Logic: look for () or )( patterns
+        // -())- : Lollipop (ball) on left, Socket on right?
+        // Actually usually: 
+        // A --() B : A provides, B requires (B has socket, A has ball?)
+        // Let's stick to visual representation for now based on string
+        
+        const type = connector.type;
+        
+        // Left Symbol
+        if (type.startsWith('-()')) {
+            connectorRenderable.symbolLeft = 'ball';
+        } else if (type.startsWith('-(')) {
+            // Want '('. At Left, rotation is 180.
+            // Need symbol that flips to '('. That is ')'.
+            // ')' is 'socket-left'.
+            connectorRenderable.symbolLeft = 'socket-left'; 
+        } else if (type.startsWith('-)')) {
+            // Want ')'. Flip of '('.
+            connectorRenderable.symbolLeft = 'socket-right';
+        }
+        
+        // Right Symbol
+        if (type.endsWith('()-')) {
+             connectorRenderable.symbolRight = 'ball';
+        } else if (type.endsWith(')-')) {
+             // Want ')'. No flip.
+             connectorRenderable.symbolRight = 'socket-left'; 
+        } else if (type.endsWith('(-')) {
+             // Want '('. No flip.
+             connectorRenderable.symbolRight = 'socket-right';
+        }
     }
     
-    stack.push(edgeRenderable);
+    stack.push(connectorRenderable);
   });
   
   return stack;

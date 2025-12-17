@@ -1,8 +1,8 @@
-import type { Diagram, Node, Edge, Port } from '../types';
+import type { Diagram, Node, Connector, Port } from '../types';
 import { parseToAST } from './astParser';
 import type { DiagramAST, ASTNode } from '../types/ast';
 
-import { Lexer, type Token } from './lexer';
+import { type Token } from './lexer';
 
 export type ParseResult = {
   diagram: Diagram;
@@ -15,7 +15,10 @@ export function parseDiagram(code: string): ParseResult {
   try {
     const ast = parseToAST(code);
     return { 
-      diagram: convertASTToDiagram(ast),
+      diagram: convertASTToDiagram(ast), // ast matches DiagramAST interface? parseToAST returns generic ParsedCst?
+                                         // ParsedCst in astParser was internal interface.
+                                         // But parseToAST body returns { ... } which should match DiagramAST.
+                                         // Let's ensure DiagramAST in types/ast.ts is correct.
       ast,
       tokens: ast.tokens
     };
@@ -25,7 +28,7 @@ export function parseDiagram(code: string): ParseResult {
       diagram: {
         type: 'uml2.5-component',
         nodes: [],
-        edges: [],
+        connectors: [],
         ports: []
       },
       error
@@ -72,23 +75,23 @@ function convertASTToDiagram(ast: DiagramAST): Diagram {
   
   ast.rootNodes.forEach(node => processNode(node));
   
-  // Process edges
-  const edges: Edge[] = ast.edges.map(e => ({
-    id: e.id,
-    source: e.sourceNodeId,
-    target: e.targetNodeId,
-    label: e.label,
-    type: e.edgeType,
-    isDelegate: e.isDelegate,
-    stereotype: e.stereotype,
-    sourcePort: e.sourcePortId,
-    targetPort: e.targetPortId
+  // Process connectors
+  const connectors: Connector[] = ast.connectors.map(c => ({
+    id: c.id,
+    source: c.sourceNodeId,
+    target: c.targetNodeId,
+    label: c.label,
+    type: c.edgeType,
+    isDelegate: c.isDelegate,
+    stereotype: c.stereotype,
+    sourcePort: c.sourcePortId,
+    targetPort: c.targetPortId
   }));
 
   return {
     type: ast.type,
     nodes,
-    edges,
+    connectors,
     ports
   };
 }

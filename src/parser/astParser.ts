@@ -1,201 +1,323 @@
 import type { DiagramAST, ASTNode, ASTEdge, ASTPort, DiagramType } from '../types/ast';
+import { Lexer, TokenType, type Token } from './lexer';
 
 const MAX_DEPTH = 50;
 
 export function parseToAST(code: string): DiagramAST {
-  const trimmedCode = code.trim();
+  const lexer = new Lexer(code);
+  const tokens = lexer.tokenize();
   
-  // Detect diagram type from wrapper: [diagram-type] { ... }
-  const diagramTypeMatch = trimmedCode.match(/^\[([^\]]+)\]\s*\{([\s\S]*)\}$/);
+  // Basic parsing state
+  let currentTokenIndex = 0;
+  
+  function peek(offset: number = 0): Token {
+    return tokens[currentTokenIndex + offset];
+  }
+  
+  function advance(): Token {
+    const token = tokens[currentTokenIndex];
+    currentTokenIndex++;
+    return token;
+  }
+  
+  function consume(type: TokenType, errorMsg?: string): Token {
+    const token = peek();
+    if (token.type === type) {
+      return advance();
+    }
+    throw new Error(errorMsg || `Expected ${type} but got ${token.type} at line ${token.line}, col ${token.column}`);
+  }
+  
+  function match(type: TokenType): boolean {
+    return peek().type === type;
+  }
+  
+  // Diagram type detection
+  // Expect [diagram-type] { ... }
+  // or just Content if no wrapper? The original parser handled wrapper.
   
   let diagramType: DiagramType = 'uml2.5-component';
-  let content = trimmedCode;
-  
-  if (diagramTypeMatch) {
-    const typeString = diagramTypeMatch[1];
-    content = diagramTypeMatch[2];
-    
-    if (typeString === 'uml2.5-component' || 
-        typeString === 'uml2.5-class' || 
-        typeString === 'uml2.5-sequence' || 
-        typeString === 'uml2.5-activity') {
-      diagramType = typeString as DiagramType;
-    }
-  }
-  
-  return parseComponentDiagramAST(content, diagramType);
-}
-
-function parseComponentDiagramAST(code: string, diagramType: DiagramType): DiagramAST {
-  const lines = code.split('\n');
-  const rootNodes: ASTNode[] = [];
-  const edges: ASTEdge[] = [];
-  
+  let rootNodes: ASTNode[] = [];
+  let edges: ASTEdge[] = [];
   let edgeIdCounter = 0;
-  
-  // Stack for tracking nested nodes
   const nodeStack: ASTNode[] = [];
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+  // Check for wrapper
+  if (match(TokenType.LBRACKET)) {
+    // Could be [diagram-type] { ... } OR just a node [id] ...
+    // Look ahead?
+    // If it's [diagram-type], next is IDENTIFIER then RBRACKET then LBRACE
+    // If it's [id], next is IDENTIFIER then RBRACKET then LABEL...
     
-    const currentDepth = nodeStack.length;
-    if (currentDepth >= MAX_DEPTH) {
-      console.warn(`Max nesting depth (${MAX_DEPTH}) exceeded`);
-      continue;
-    }
+    // Let's rely on the identifier value?
+    const nextFn = peek(1);
+    const validTypes = ['uml2.5-component', 'uml2.5-class', 'uml2.5-sequence', 'uml2.5-activity'];
     
-    // End nested component: }
-    if (line === '}') {
-      if (nodeStack.length > 0) {
-        nodeStack.pop();
-      }
-      continue;
-    }
-    
-    // Node with nested children: [id] label @ x,y {
-    const nestedNodeMatch = line.match(/^\[(\w+)\]\s+(.+?)(?:\s+@\s*(-?\d+),\s*(-?\d+))?\s*\{$/);
-    if (nestedNodeMatch) {
-      const id = nestedNodeMatch[1];
-      const label = nestedNodeMatch[2];
-      const x = nestedNodeMatch[3] ? parseInt(nestedNodeMatch[3], 10) : undefined;
-      const y = nestedNodeMatch[4] ? parseInt(nestedNodeMatch[4], 10) : undefined;
-      
-      const node: ASTNode = {
-        id,
-        label,
-        x,
-        y,
-        children: [],
-        ports: []
-      };
-      
-      // Add to parent or root
-      if (nodeStack.length > 0) {
-        nodeStack[nodeStack.length - 1].children.push(node);
-      } else {
-        rootNodes.push(node);
-      }
-      
-      nodeStack.push(node);
-      continue;
-    }
-    
-    // Simple node: [id] label @ x,y
-    const simpleNodeMatch = line.match(/^\[(\w+)\]\s+(.+?)(?:\s+@\s*(-?\d+),\s*(-?\d+))?$/);
-    if (simpleNodeMatch) {
-      const id = simpleNodeMatch[1];
-      const label = simpleNodeMatch[2];
-      const x = simpleNodeMatch[3] ? parseInt(simpleNodeMatch[3], 10) : undefined;
-      const y = simpleNodeMatch[4] ? parseInt(simpleNodeMatch[4], 10) : undefined;
-      
-      const node: ASTNode = {
-        id,
-        label,
-        x,
-        y,
-        children: [],
-        ports: []
-      };
-      
-      // Add to parent or root
-      if (nodeStack.length > 0) {
-        nodeStack[nodeStack.length - 1].children.push(node);
-      } else {
-        rootNodes.push(node);
-      }
-      continue;
-    }
-    
-    // Port definition: port [portId] on [nodeId] side : label
-    const portMatch = line.match(/^port\s+\[(\w+)\]\s+on\s+\[(\w+)\]\s+(left|right|top|bottom)(?:\s*:\s*(.+))?$/);
-    if (portMatch) {
-      const portId = portMatch[1];
-      const nodeId = portMatch[2];
-      const side = portMatch[3] as 'left' | 'right' | 'top' | 'bottom';
-      const label = portMatch[4];
-      
-      // Find the node in the tree and add port
-      const findAndAddPort = (nodes: ASTNode[]): boolean => {
-        for (const node of nodes) {
-          if (node.id === nodeId) {
-            node.ports.push({ id: portId, label, side });
-            return true;
-          }
-          if (findAndAddPort(node.children)) {
-            return true;
-          }
-        }
-        return false;
-      };
-      
-      if (nodeStack.length > 0) {
-        findAndAddPort([nodeStack[0]]);
-      } else {
-        findAndAddPort(rootNodes);
-      }
-      continue;
-    }
-    
-    // Delegate edge: source ->delegate-> target
-    const delegateMatch = line.match(/^([\w.]+)\s+->delegate->\s+([\w.]+)(?:\s*:\s*(.+))?$/);
-    if (delegateMatch) {
-      const sourceParts = delegateMatch[1].split('.');
-      const targetParts = delegateMatch[2].split('.');
-      
-      edges.push({
-        id: `edge-${edgeIdCounter++}`,
-        sourceNodeId: sourceParts[0],
-        targetNodeId: targetParts[0],
-        sourcePortId: sourceParts[1],
-        targetPortId: targetParts[1],
-        label: delegateMatch[3],
-        isDelegate: true,
-        stereotype: 'delegate'
-      });
-      continue;
-    }
-    
-    // Edge with interface symbols: -())- or -(()-
-    const interfaceMatch = line.match(/^([\w.]+)\s+(-(?:\(\)|[()])+-)?\s+([\w.]+)(?:\s*:\s*(.+))?$/);
-    if (interfaceMatch && interfaceMatch[2]) {
-      const sourceParts = interfaceMatch[1].split('.');
-      const targetParts = interfaceMatch[3].split('.');
-      
-      edges.push({
-        id: `edge-${edgeIdCounter++}`,
-        sourceNodeId: sourceParts[0],
-        targetNodeId: targetParts[0],
-        sourcePortId: sourceParts[1],
-        targetPortId: targetParts[1],
-        edgeType: interfaceMatch[2].trim(),
-        label: interfaceMatch[4]
-      });
-      continue;
-    }
-    
-    // Regular edge: source -> target
-    const edgeMatch = line.match(/^([\w.]+)\s+->\s+([\w.]+)(?:\s*:\s*(.+))?$/);
-    if (edgeMatch) {
-      const sourceParts = edgeMatch[1].split('.');
-      const targetParts = edgeMatch[2].split('.');
-      
-      edges.push({
-        id: `edge-${edgeIdCounter++}`,
-        sourceNodeId: sourceParts[0],
-        targetNodeId: targetParts[0],
-        sourcePortId: sourceParts[1],
-        targetPortId: targetParts[1],
-        label: edgeMatch[3]
-      });
+    if (nextFn.type === TokenType.IDENTIFIER && validTypes.includes(nextFn.value)) {
+       // It's a diagram wrapper
+       consume(TokenType.LBRACKET);
+       const typeToken = consume(TokenType.IDENTIFIER);
+       diagramType = typeToken.value as DiagramType;
+       consume(TokenType.RBRACKET);
+       consume(TokenType.LBRACE);
+       
+       // Parse content inside
+       parseBlockContent();
+       
+       // Expect closing brace
+       if (match(TokenType.RBRACE)) {
+         consume(TokenType.RBRACE);
+       }
+       return { type: diagramType, rootNodes, edges };
     }
   }
   
-  return {
-    type: diagramType,
-    rootNodes,
-    edges
-  };
-}
+  // If no wrapper, just parse content
+  parseBlockContent();
+  
+  function parseBlockContent() {
+    while (!match(TokenType.EOF) && !match(TokenType.RBRACE)) {
+      if (match(TokenType.NEWLINE)) {
+        advance();
+        continue;
+      }
+      
+      parseStatement();
+    }
+  }
+  
+  function parseStatement() {
+    // 1. Port definition: port [id] on [node] side : label
+    if (match(TokenType.KEYWORD_PORT)) {
+      parsePort();
+      return;
+    }
+    
+    // 2. Node or Edge
+    // Node starts with [id]
+    // Edge starts with Identifier (source) -> ...
+    
+    if (match(TokenType.LBRACKET)) {
+      parseNode();
+    } else if (match(TokenType.IDENTIFIER)) {
+      parseEdge();
+    } else {
+      // Unknown or unexpected token, skip to newline
+      // console.warn('Unexpected token:', peek());
+      advance();
+      while (!match(TokenType.NEWLINE) && !match(TokenType.EOF)) {
+        advance();
+      }
+    }
+  }
+  
+  function parseNode() {
+    consume(TokenType.LBRACKET);
+    const idToken = consume(TokenType.IDENTIFIER, "Expected node ID");
+    consume(TokenType.RBRACKET);
+    
+    // Label can be multiple tokens until @ or { or newline
+    let label = "";
+    while(
+        !match(TokenType.AT) && 
+        !match(TokenType.LBRACE) && 
+        !match(TokenType.NEWLINE) && 
+        !match(TokenType.EOF) &&
+        !match(TokenType.RBRACE) // End of block
+    ) {
+        if (label.length > 0) label += " ";
+        label += advance().value;
+    }
+    label = label.trim();
+    
+    let x: number | undefined;
+    let y: number | undefined;
+    
+    if (match(TokenType.AT)) {
+      consume(TokenType.AT);
+      const xToken = consume(TokenType.NUMBER);
+      consume(TokenType.COMMA);
+      const yToken = consume(TokenType.NUMBER);
+      x = parseInt(xToken.value, 10);
+      y = parseInt(yToken.value, 10);
+    }
+    
+    const node: ASTNode = {
+      id: idToken.value,
+      label,
+      x,
+      y,
+      children: [],
+      ports: []
+    };
+    
+    const parent = nodeStack.length > 0 ? nodeStack[nodeStack.length - 1] : null;
+    if (parent) {
+      parent.children.push(node);
+    } else {
+      rootNodes.push(node);
+    }
+    
+    // Nested content?
+    if (match(TokenType.LBRACE)) {
+      consume(TokenType.LBRACE);
+      nodeStack.push(node);
+      
+      if (nodeStack.length > MAX_DEPTH) {
+          console.warn("Max nesting depth exceeded");
+      }
+      
+      parseBlockContent();
+      
+      consume(TokenType.RBRACE);
+      nodeStack.pop();
+    }
+  }
+  
+  function parseEdge() {
+    // source . port ... or source ...
+    const sourceToken = consume(TokenType.IDENTIFIER, "Expected source node");
+    let sourcePortId: string | undefined;
+    
+    // Check for source.port
+    // The previous token was just source. If next is DOT... wait, Lexer doesn't have DOT token, it treats "source.port" as IDENTIFIER if simple
+    // My Lexer implementation: identifier allows dots inside.
+    // So "NodeA.p1" is one token.
+    
+    let sourceNodeId = sourceToken.value;
+    if (sourceNodeId.includes('.')) {
+        const parts = sourceNodeId.split('.');
+        sourceNodeId = parts[0];
+        sourcePortId = parts[1];
+    }
+    
+    // Edge Type
+    let edgeType: string | undefined;
+    let stereotype: string | undefined;
+    let isDelegate = false;
+    
+    if (match(TokenType.ARROW)) {
+      consume(TokenType.ARROW);
+    } else if (match(TokenType.DELEGATE_ARROW)) {
+      consume(TokenType.DELEGATE_ARROW);
+      isDelegate = true;
+      stereotype = 'delegate';
+    } else if (match(TokenType.INTERFACE_CONNECTOR)) {
+      edgeType = consume(TokenType.INTERFACE_CONNECTOR).value;
+      // Previous regex: match[2] was (-...-) 
+      // Actually regex was: ^([\w.]+)\s+(-(?:\(\)|[()])+-)?\s+...
+      // So it captured the whole thing.
+      // Wait, let's check old parser:
+      // const edgeType = interfaceMatch[2].trim(); -> it included the dashes.
+      // My lexer returns full string "-())-".
+      // ASTEdge type expects string.
+      // So no need to trim.
+      // But wait:
+      // if (type && type.includes('(') && type.includes(')')) in Edge.tsx
+      // const symbolMatch = type.match(/-([()]+)-/);
+      // It expects dashes.
+    } else {
+       throw new Error(`Unexpected token for edge connection: ${peek().type}`);
+    }
+    
+    // Target
+    const targetToken = consume(TokenType.IDENTIFIER, "Expected target node");
+    let targetNodeId = targetToken.value;
+    let targetPortId: string | undefined;
+    
+    if (targetNodeId.includes('.')) {
+        const parts = targetNodeId.split('.');
+        targetNodeId = parts[0];
+        targetPortId = parts[1];
+    }
+    
+    // Label
+    let label: string | undefined;
+    if (match(TokenType.COLON)) {
+      consume(TokenType.COLON);
+      // Label until end of line
+      let l = "";
+      while(!match(TokenType.NEWLINE) && !match(TokenType.EOF)) {
+          if (l.length > 0) l += " ";
+           l += advance().value;
+      }
+      label = l.trim();
+    }
+    
+    edges.push({
+      id: `edge-${edgeIdCounter++}`,
+      sourceNodeId,
+      targetNodeId,
+      sourcePortId,
+      targetPortId,
+      label,
+      isDelegate,
+      stereotype,
+      edgeType
+    });
+  }
+  
+  function parsePort() {
+    consume(TokenType.KEYWORD_PORT);
+    consume(TokenType.LBRACKET);
+    const id = consume(TokenType.IDENTIFIER).value;
+    consume(TokenType.RBRACKET);
+    consume(TokenType.KEYWORD_ON);
+    consume(TokenType.LBRACKET);
+    const nodeId = consume(TokenType.IDENTIFIER).value;
+    consume(TokenType.RBRACKET);
+    
+    const sideToken = consume(TokenType.SIDE);
+    const side = sideToken.value as 'left' | 'right' | 'top' | 'bottom';
+    
+    let label: string | undefined;
+    if (match(TokenType.COLON)) {
+        consume(TokenType.COLON);
+        // Label might be rest of line
+        let l = "";
+        while(!match(TokenType.NEWLINE) && !match(TokenType.EOF)) {
+            if (l.length > 0) l += " ";
+            l += advance().value;
+        }
+        label = l.trim();
+    }
+    
+    // Add port to node
+    // Need to find node in rootNodes or nodeStack?
+    // User might define port inside the nested block or outside.
+    // "port [p1] on [NodeB]" -> implies we search globally?
+    // Old parser: 
+    // const findAndAddPort = (nodes: ASTNode[]): boolean => { ... recurse ... }
+    
+    const findAndAddPort = (nodes: ASTNode[]): boolean => {
+      for (const node of nodes) {
+        if (node.id === nodeId) {
+          node.ports.push({ id, label, side });
+          return true;
+        }
+        if (findAndAddPort(node.children)) {
+          return true;
+        }
+      }
+      return false;
+    };
+    
+    // Try to find in current scope? Or global?
+    // Old parser checked nodeStack first?
+    // No, it checked rootNodes if stack empty, or stack[0] (root of current path?).
+    // Actually:
+    // if (nodeStack.length > 0) findAndAddPort([nodeStack[0]]); else findAndAddPort(rootNodes);
+    // This implies ports must be defined within the context of the component if we are inside one?
+    // Or nodeStack[0] is the top-most parent being parsed?
+    
+    // Let's search from rootNodes to be safe, assuming IDs are unique enough or user knows what they are doing.
+    if (!findAndAddPort(rootNodes)) {
+        // If we are deep inside, maybe the node is in the stack but not attached to root yet?
+        // But nodes are added to parents immediately.
+        // So searching from rootNodes is comprehensive.
+        console.warn(`Node ${nodeId} not found for port ${id}`);
+    }
+  }
 
+  return { type: diagramType, rootNodes, edges };
+}

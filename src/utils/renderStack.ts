@@ -1,5 +1,5 @@
 import type { Diagram, Node } from '../types';
-import type { RenderStack, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable } from '../types/renderables';
+import type { RenderStack, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable, Renderable } from '../types/renderables';
 
 // Helper to calculate node dimensions
 function getNodeDimensions(node: Node, allNodes: Node[]): { width: number; height: number } {
@@ -61,10 +61,10 @@ export function buildRenderStack(diagram: Diagram, theme: 'light' | 'dark'): Ren
       y: node.y,
       width: dims.width,
       height: dims.height,
-      fillColor: bgColor,
+      fillColor: hasChildren ? 'transparent' : bgColor,
       strokeColor: borderColor,
       transparent: hasChildren,
-      opacity: hasChildren ? 0 : 1,
+      opacity: 1,
       nodeId: node.id,
       isDraggable: true
     };
@@ -189,7 +189,7 @@ export function updateNodePositionInStack(
     let belongsToNode = false;
     
     if (renderable.type === 'rectangle') {
-      belongsToNode = nodesToUpdate.includes((renderable as RectangleRenderable).nodeId);
+      belongsToNode = nodesToUpdate.includes((renderable as RectangleRenderable).nodeId || '');
     } else if (renderable.id.includes('-')) {
       const renderableNodeId = renderable.id.split('-')[1];
       belongsToNode = nodesToUpdate.includes(renderableNodeId);

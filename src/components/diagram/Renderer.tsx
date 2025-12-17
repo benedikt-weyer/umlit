@@ -1,10 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Text, Plane } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
-import type { ThreeEvent } from '@react-three/fiber';
-import * as THREE from 'three';
-import type { RenderStack, Renderable, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable } from '../../types/renderables';
-import { getRenderableAt } from '../../utils/renderStack';
+import React, { useState } from 'react';
+import { Text, Rect, Group } from 'react-konva';
+import type { RenderStack, RectangleRenderable, TextRenderable, PortRenderable, BookIconRenderable } from '../../types/renderables';
 
 interface RendererProps {
   renderStack: RenderStack;
@@ -12,54 +8,10 @@ interface RendererProps {
 }
 
 export const Renderer: React.FC<RendererProps> = ({ renderStack, onNodeDrag }) => {
-  const { gl, camera } = useThree();
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-  const dragOffsetRef = useRef({ x: 0, y: 0 });
-
-  const handlePointerDown = (e: ThreeEvent<PointerEvent>, renderable: RectangleRenderable) => {
-    if (!renderable.isDraggable) return;
-    
-    e.stopPropagation();
-    setDraggingNodeId(renderable.nodeId);
-    
-    dragOffsetRef.current = {
-      x: e.point.x - renderable.x,
-      y: -e.point.y - renderable.y
-    };
-  };
-
-  useEffect(() => {
-    if (!draggingNodeId) return;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      const rect = gl.domElement.getBoundingClientRect();
-      const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-      const vector = new THREE.Vector3(mouseX, mouseY, 0.5);
-      vector.unproject(camera);
-
-      const newX = Math.round(vector.x - dragOffsetRef.current.x);
-      const newY = Math.round(-vector.y - dragOffsetRef.current.y);
-      
-      onNodeDrag(draggingNodeId, newX, newY);
-    };
-
-    const handlePointerUp = () => {
-      setDraggingNodeId(null);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [draggingNodeId, gl, camera, onNodeDrag]);
 
   return (
-    <group>
+    <Group>
       {renderStack.map((renderable) => {
         switch (renderable.type) {
           case 'rectangle':
@@ -67,7 +19,9 @@ export const Renderer: React.FC<RendererProps> = ({ renderStack, onNodeDrag }) =
               <RenderRectangle
                 key={renderable.id}
                 renderable={renderable as RectangleRenderable}
-                onPointerDown={handlePointerDown}
+                onNodeDrag={onNodeDrag}
+                draggingNodeId={draggingNodeId}
+                setDraggingNodeId={setDraggingNodeId}
               />
             );
           case 'text':
@@ -80,114 +34,150 @@ export const Renderer: React.FC<RendererProps> = ({ renderStack, onNodeDrag }) =
             return null;
         }
       })}
-    </group>
+    </Group>
   );
 };
 
 // Component for rendering rectangles
 const RenderRectangle: React.FC<{
   renderable: RectangleRenderable;
-  onPointerDown: (e: ThreeEvent<PointerEvent>, renderable: RectangleRenderable) => void;
-}> = ({ renderable, onPointerDown }) => {
-  const position: [number, number, number] = [renderable.x, -renderable.y, renderable.zIndex * 0.01];
-  
+  onNodeDrag: (nodeId: string, x: number, y: number) => void;
+  draggingNodeId: string | null;
+  setDraggingNodeId: (id: string | null) => void;
+}> = ({ renderable, onNodeDrag, draggingNodeId, setDraggingNodeId }) => {
   return (
-    <Plane
-      position={position}
-      args={[renderable.width, renderable.height]}
-      onPointerDown={(e) => onPointerDown(e, renderable)}
-    >
-      <meshBasicMaterial
-        color={renderable.fillColor}
-        transparent={renderable.transparent}
-        opacity={renderable.opacity}
-      />
-      <lineSegments>
-        <edgesGeometry args={[new THREE.PlaneGeometry(renderable.width, renderable.height)]} />
-        <lineBasicMaterial color={renderable.strokeColor} />
-      </lineSegments>
-    </Plane>
+    <Rect
+      x={renderable.x - renderable.width / 2}
+      y={renderable.y - renderable.height / 2}
+      width={renderable.width}
+      height={renderable.height}
+      fill={renderable.fillColor}
+      stroke={renderable.strokeColor}
+      strokeWidth={1}
+      opacity={renderable.opacity}
+      draggable={renderable.isDraggable}
+      onDragStart={() => {
+        if (renderable.isDraggable) {
+          setDraggingNodeId(renderable.nodeId || '');
+        }
+      }}
+      onDragMove={(e) => {
+        if (renderable.isDraggable && draggingNodeId === renderable.nodeId) {
+          const newX = Math.round(e.target.x() + renderable.width / 2);
+          const newY = Math.round(e.target.y() + renderable.height / 2);
+          onNodeDrag(renderable.nodeId || '', newX, newY);
+        }
+      }}
+      onDragEnd={() => {
+        setDraggingNodeId(null);
+      }}
+    />
   );
 };
 
 // Component for rendering text
 const RenderText: React.FC<{ renderable: TextRenderable }> = ({ renderable }) => {
-  const position: [number, number, number] = [renderable.x, -renderable.y, renderable.zIndex * 0.01];
-  
+  // Konva Text uses offsetX/offsetY differently than Three.js
+  // For center alignment, we need to set width and use offsetX
+  let width: number | undefined = undefined;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  // Handle horizontal alignment
+  if (renderable.anchorX === 'center') {
+    // Estimate text width (rough approximation)
+    width = renderable.content.length * renderable.fontSize * 0.6;
+    offsetX = width / 2;
+  } else if (renderable.anchorX === 'right') {
+    width = renderable.content.length * renderable.fontSize * 0.6;
+    offsetX = width;
+  }
+
+  // Handle vertical alignment
+  if (renderable.anchorY === 'middle') {
+    offsetY = renderable.fontSize / 2;
+  } else if (renderable.anchorY === 'bottom') {
+    offsetY = renderable.fontSize;
+  }
+
   return (
     <Text
-      position={position}
+      x={renderable.x}
+      y={renderable.y}
+      text={renderable.content}
       fontSize={renderable.fontSize}
-      color={renderable.color}
-      anchorX={renderable.anchorX}
-      anchorY={renderable.anchorY}
-    >
-      {renderable.content}
-    </Text>
+      fill={renderable.color}
+      width={width}
+      offsetX={offsetX}
+      offsetY={offsetY}
+    />
   );
 };
 
 // Component for rendering ports
 const RenderPort: React.FC<{ renderable: PortRenderable }> = ({ renderable }) => {
-  const position: [number, number, number] = [renderable.x, -renderable.y, renderable.zIndex * 0.01];
-  
   return (
-    <group>
-      <Plane position={position} args={[renderable.size, renderable.size]}>
-        <meshBasicMaterial color={renderable.color} />
-        <lineSegments>
-          <edgesGeometry args={[new THREE.PlaneGeometry(renderable.size, renderable.size)]} />
-          <lineBasicMaterial color={renderable.strokeColor} />
-        </lineSegments>
-      </Plane>
+    <Group>
+      <Rect
+        x={renderable.x - renderable.size / 2}
+        y={renderable.y - renderable.size / 2}
+        width={renderable.size}
+        height={renderable.size}
+        fill={renderable.color}
+        stroke={renderable.strokeColor}
+        strokeWidth={1}
+      />
       {renderable.label && (
         <Text
-          position={[position[0], position[1] + 10, position[2]]}
+          x={renderable.x}
+          y={renderable.y + renderable.size / 2 + 4}
+          text={renderable.label}
           fontSize={10}
-          color={renderable.strokeColor}
-          anchorX="center"
-          anchorY="middle"
-        >
-          {renderable.label}
-        </Text>
+          fill={renderable.strokeColor}
+          align="center"
+          offsetX={0}
+        />
       )}
-    </group>
+    </Group>
   );
 };
 
 // Component for rendering book icon
 const RenderBookIcon: React.FC<{ renderable: BookIconRenderable }> = ({ renderable }) => {
-  const position: [number, number, number] = [renderable.x, -renderable.y, renderable.zIndex * 0.01];
-  
   return (
-    <group>
+    <Group>
       {/* Main book cover */}
-      <Plane position={position} args={[14, 18]}>
-        <meshBasicMaterial color={renderable.color} />
-        <lineSegments>
-          <edgesGeometry args={[new THREE.PlaneGeometry(14, 18)]} />
-          <lineBasicMaterial color={renderable.strokeColor} />
-        </lineSegments>
-      </Plane>
+      <Rect
+        x={renderable.x - 7}
+        y={renderable.y - 9}
+        width={14}
+        height={18}
+        fill={renderable.color}
+        stroke={renderable.strokeColor}
+        strokeWidth={1}
+      />
       
       {/* Binding rectangle 1 (top) */}
-      <Plane position={[position[0] - 6.5, position[1] + 5, position[2] + 0.01]} args={[3, 6]}>
-        <meshBasicMaterial color={renderable.color} />
-        <lineSegments>
-          <edgesGeometry args={[new THREE.PlaneGeometry(3, 6)]} />
-          <lineBasicMaterial color={renderable.strokeColor} />
-        </lineSegments>
-      </Plane>
+      <Rect
+        x={renderable.x - 7 - 3}
+        y={renderable.y - 9 + 3}
+        width={3}
+        height={6}
+        fill={renderable.color}
+        stroke={renderable.strokeColor}
+        strokeWidth={1}
+      />
       
       {/* Binding rectangle 2 (bottom) */}
-      <Plane position={[position[0] - 6.5, position[1] - 5, position[2] + 0.01]} args={[3, 6]}>
-        <meshBasicMaterial color={renderable.color} />
-        <lineSegments>
-          <edgesGeometry args={[new THREE.PlaneGeometry(3, 6)]} />
-          <lineBasicMaterial color={renderable.strokeColor} />
-        </lineSegments>
-      </Plane>
-    </group>
+      <Rect
+        x={renderable.x - 7 - 3}
+        y={renderable.y - 9 + 12}
+        width={3}
+        height={6}
+        fill={renderable.color}
+        stroke={renderable.strokeColor}
+        strokeWidth={1}
+      />
+    </Group>
   );
 };
-

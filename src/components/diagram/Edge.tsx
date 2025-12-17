@@ -1,9 +1,8 @@
 import React from 'react';
-import { Line, Text } from '@react-three/drei';
+import { Line, Circle, Ring, Arc, Text, Arrow, Group } from 'react-konva';
 import type { Edge as EdgeType } from '../../types';
 import { useStore } from '../../store';
 import { useTheme } from '../ThemeContextProvider';
-import * as THREE from 'three';
 
 export const Edge: React.FC<EdgeType> = ({ source, target, type, isDelegate, stereotype, sourcePort, targetPort }) => {
   const diagram = useStore((state) => state.diagram);
@@ -114,31 +113,24 @@ export const Edge: React.FC<EdgeType> = ({ source, target, type, isDelegate, ste
   let endX: number, endY: number;
   
   if (sourcePort) {
-    // Use port position
     [startX, startY] = getPortPosition(sourcePort, fromNode);
   } else {
-    // Use border intersection
     const targetPos = targetPort ? getPortPosition(targetPort, toNode) : [toNode.x, toNode.y];
     [startX, startY] = calculateBorderPoint(fromNode, targetPos[0], targetPos[1]);
   }
   
   if (targetPort) {
-    // Use port position
     [endX, endY] = getPortPosition(targetPort, toNode);
   } else {
-    // Use border intersection
     const sourcePos = sourcePort ? getPortPosition(sourcePort, fromNode) : [fromNode.x, fromNode.y];
     [endX, endY] = calculateBorderPoint(toNode, sourcePos[0], sourcePos[1]);
   }
-  
-  const startPoint: [number, number, number] = [startX, -startY, 1];
-  const endPoint: [number, number, number] = [endX, -endY, 1];
 
-  const ballRadius = 12; // Full circle (ball)
-  const socketRadius = 16; // Half circle (socket) - bigger than ball
+  const ballRadius = 12;
+  const socketRadius = 16;
   
-  const dx = endPoint[0] - startPoint[0];
-  const dy = endPoint[1] - startPoint[1];
+  const dx = endX - startX;
+  const dy = endY - startY;
   const length = Math.sqrt(dx * dx + dy * dy);
   const angle = Math.atan2(dy, dx);
 
@@ -151,19 +143,15 @@ export const Edge: React.FC<EdgeType> = ({ source, target, type, isDelegate, ste
     if (symbolMatch) {
       const symbols = symbolMatch[1];
       
-      // Check if starts with ()
       if (symbols.startsWith('()')) {
         leftSymbol = 'full';
-        // Remaining after ()
         const rest = symbols.substring(2);
         if (rest === ')') rightSymbol = 'left';
         else if (rest === '(') rightSymbol = 'right';
         else if (rest === '()') rightSymbol = 'full';
       } 
-      // Check if starts with single paren
       else if (symbols.startsWith(')')) {
         leftSymbol = 'left';
-        // Check what comes after
         const rest = symbols.substring(1);
         if (rest === ')') rightSymbol = 'left';
         else if (rest === '(') rightSymbol = 'right';
@@ -171,7 +159,6 @@ export const Edge: React.FC<EdgeType> = ({ source, target, type, isDelegate, ste
       }
       else if (symbols.startsWith('(')) {
         leftSymbol = 'right';
-        // Check what comes after
         const rest = symbols.substring(1);
         if (rest === ')') rightSymbol = 'left';
         else if (rest === '(') rightSymbol = 'right';  
@@ -180,14 +167,11 @@ export const Edge: React.FC<EdgeType> = ({ source, target, type, isDelegate, ste
     }
   }
 
-  // Calculate center position - both symbols share the same center
-  const centerX = (startPoint[0] + endPoint[0]) / 2;
-  const centerY = (startPoint[1] + endPoint[1]) / 2;
+  // Calculate center position
+  const centerX = (startX + endX) / 2;
+  const centerY = (startY + endY) / 2;
 
-  // Both symbols at the same position (same center point)
-  const symbolPos: [number, number, number] = [centerX, centerY, 1];
-
-  // Calculate line break points based on the larger socket radius
+  // Calculate line break points
   const lineBreakLeftX = centerX - (dx / length) * socketRadius;
   const lineBreakLeftY = centerY - (dy / length) * socketRadius;
   const lineBreakRightX = centerX + (dx / length) * socketRadius;
@@ -197,119 +181,112 @@ export const Edge: React.FC<EdgeType> = ({ source, target, type, isDelegate, ste
     if (symbolType === 'full') {
       // Full hollow circle (ball)
       return (
-        <>
-          <mesh position={symbolPos}>
-            <circleGeometry args={[ballRadius, 32]} />
-            <meshBasicMaterial color={bgColor} />
-          </mesh>
-          <mesh position={symbolPos}>
-            <ringGeometry args={[ballRadius - 1, ballRadius, 32]} />
-            <meshBasicMaterial color={symbolColor} />
-          </mesh>
-        </>
+        <Group key={`symbol-${isLeftSide ? 'left' : 'right'}`}>
+          <Circle
+            x={centerX}
+            y={centerY}
+            radius={ballRadius}
+            fill={bgColor}
+          />
+          <Ring
+            x={centerX}
+            y={centerY}
+            innerRadius={ballRadius - 1}
+            outerRadius={ballRadius}
+            fill={symbolColor}
+          />
+        </Group>
       );
     } else {
-      // Half circle (socket) - bigger than ball
-      // ringGeometry at 0 rotation opens to the right (⊂)
-      // We need to rotate based on line angle and which side we're on
-      
-      let rotation = angle;
+      // Half circle (socket)
+      let rotation = (angle * 180) / Math.PI;
       
       if (isLeftSide) {
-        // Left side symbol should open to the right (⊂ direction)
-        rotation = angle + Math.PI / 2;
+        rotation = rotation + 90;
         if (symbolType === 'left') {
-          // This is ) which naturally opens left, flip it
-          rotation += Math.PI;
+          rotation += 180;
         }
       } else {
-        // Right side symbol should open to the left (⊃ direction)
-        rotation = angle - Math.PI / 2;
+        rotation = rotation - 90;
         if (symbolType === 'right') {
-          // This is ( which naturally opens right, flip it
-          rotation += Math.PI;
+          rotation += 180;
         }
       }
       
       return (
-        <mesh position={symbolPos} rotation={[0, 0, rotation]}>
-          <ringGeometry args={[socketRadius - 1, socketRadius, 32, 1, 0, Math.PI]} />
-          <meshBasicMaterial color={symbolColor} side={THREE.DoubleSide} />
-        </mesh>
+        <Arc
+          key={`symbol-${isLeftSide ? 'left' : 'right'}`}
+          x={centerX}
+          y={centerY}
+          innerRadius={socketRadius - 1}
+          outerRadius={socketRadius}
+          angle={180}
+          rotation={rotation}
+          fill={symbolColor}
+        />
       );
     }
   };
 
-  // For delegate arrows, render dashed line
+  // For delegate arrows
   if (isDelegate) {
-    // Create dashed line material
-    const dashedMaterial = new THREE.LineDashedMaterial({
-      color: lineColor,
-      dashSize: 5,
-      gapSize: 3,
-      linewidth: 2
-    });
-
-    const centerX = (startPoint[0] + endPoint[0]) / 2;
-    const centerY = (startPoint[1] + endPoint[1]) / 2;
-
     return (
-      <group>
-        {/* Dashed line for delegate arrow */}
+      <Group>
+        {/* Dashed line */}
         <Line
-          points={[startPoint, endPoint]}
-          color={lineColor}
-          lineWidth={2}
-          dashed
-          dashScale={1}
-          dashSize={5}
-          gapSize={3}
+          points={[startX, startY, endX, endY]}
+          stroke={lineColor}
+          strokeWidth={2}
+          dash={[5, 3]}
         />
         
-        {/* <<delegate>> stereotype label */}
+        {/* Stereotype label */}
         {stereotype && (
           <Text
-            position={[centerX, centerY + 10, 1.5]}
+            x={centerX}
+            y={centerY - 10}
+            text={`<<${stereotype}>>`}
             fontSize={10}
-            color={textColor}
-            anchorX="center"
-            anchorY="middle"
-          >
-            {`<<${stereotype}>>`}
-          </Text>
+            fill={textColor}
+            width={100}
+            align="center"
+            offsetX={50}
+          />
         )}
         
-        {/* Arrow head at target */}
-        <mesh position={endPoint} rotation={[0, 0, angle]}>
-          <coneGeometry args={[3, 8, 3]} />
-          <meshBasicMaterial color={lineColor} />
-        </mesh>
-      </group>
+        {/* Arrow head */}
+        <Arrow
+          points={[endX - Math.cos(angle) * 10, endY - Math.sin(angle) * 10, endX, endY]}
+          pointerLength={8}
+          pointerWidth={8}
+          fill={lineColor}
+          stroke={lineColor}
+          strokeWidth={2}
+        />
+      </Group>
     );
   }
 
   // Regular edges with interface symbols
   return (
-    <group>
+    <Group>
       {/* Line segment from start to left symbol */}
       <Line
-        points={[startPoint, [lineBreakLeftX, lineBreakLeftY, 1]]}
-        color={lineColor}
-        lineWidth={2}
+        points={[startX, startY, lineBreakLeftX, lineBreakLeftY]}
+        stroke={lineColor}
+        strokeWidth={2}
       />
       
       {/* Line segment from right symbol to end */}
       <Line
-        points={[[lineBreakRightX, lineBreakRightY, 1], endPoint]}
-        color={lineColor}
-        lineWidth={2}
+        points={[lineBreakRightX, lineBreakRightY, endX, endY]}
+        stroke={lineColor}
+        strokeWidth={2}
       />
       
-      {/* Render left symbol */}
+      {/* Render symbols */}
       {leftSymbol && renderSymbol(leftSymbol, true)}
-      
-      {/* Render right symbol */}
       {rightSymbol && renderSymbol(rightSymbol, false)}
-    </group>
+    </Group>
   );
 };

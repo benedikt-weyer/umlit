@@ -1,4 +1,4 @@
-import type { Node } from '../types';
+import type { Node, Diagram, Port } from '../types';
 
 interface LayoutConfig {
   horizontalSpacing: number;
@@ -31,9 +31,9 @@ function getBoundingBox(childNodes: Node[], allNodes: Node[]): { width: number; 
     maxY = Math.max(maxY, child.y + childBounds.height / 2);
   });
   
-  const sidePadding = 20;
+  const sidePadding = 50; // Increased horizontal padding
   const labelSpace = 35;
-  const verticalPadding = 20;
+  const verticalPadding = 50; // Increased vertical padding
   
   const width = Math.max(200, (maxX - minX) + sidePadding * 2);
   const height = Math.max(120, (maxY - minY) + verticalPadding * 2 + labelSpace);
@@ -42,6 +42,57 @@ function getBoundingBox(childNodes: Node[], allNodes: Node[]): { width: number; 
 }
 
 // Calculate node dimensions including children (for rendering)
+// Helper to calculate node position bounds (minX, maxX, minY, maxY)
+function getNodePositionBounds(node: Node, allNodes: Node[]): { minX: number; maxX: number; minY: number; maxY: number } {
+  const hasChildren = node.children && node.children.length > 0;
+  
+  if (!hasChildren) {
+    const width = 150;
+    const height = 80;
+    return {
+      minX: node.x - width / 2,
+      maxX: node.x + width / 2,
+      minY: node.y - height / 2,
+      maxY: node.y + height / 2
+    };
+  }
+  
+  const childNodes = allNodes.filter(n => n.parentId === node.id);
+  if (childNodes.length === 0) {
+    const width = 150;
+    const height = 80;
+    return {
+      minX: node.x - width / 2,
+      maxX: node.x + width / 2,
+      minY: node.y - height / 2,
+      maxY: node.y + height / 2
+    };
+  }
+  
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  
+  childNodes.forEach(child => {
+    const childBounds = getNodePositionBounds(child, allNodes);
+    minX = Math.min(minX, childBounds.minX);
+    maxX = Math.max(maxX, childBounds.maxX);
+    minY = Math.min(minY, childBounds.minY);
+    maxY = Math.max(maxY, childBounds.maxY);
+  });
+  
+  // Add padding for parent
+  const sidePadding = 50;
+  const labelSpace = 35;
+  const verticalPadding = 50;
+  
+  return {
+    minX: minX - sidePadding,
+    maxX: maxX + sidePadding,
+    minY: minY - verticalPadding - labelSpace,
+    maxY: maxY + verticalPadding
+  };
+}
+
 function getNodeBounds(node: Node, allNodes: Node[]): { width: number; height: number } {
   const hasChildren = node.children && node.children.length > 0;
   
@@ -54,9 +105,9 @@ function getNodeBounds(node: Node, allNodes: Node[]): { width: number; height: n
     return { width: 150, height: 80 };
   }
   
-  const sidePadding = 20;
+  const sidePadding = 50; // Increased horizontal padding
   const labelSpace = 35;
-  const verticalPadding = 20;
+  const verticalPadding = 50; // Increased vertical padding
   
   let minX = Infinity, maxX = -Infinity;
   let minY = Infinity, maxY = -Infinity;
@@ -128,8 +179,8 @@ function layoutChildrenInParent(parentId: string, parentX: number, parentY: numb
   return newNodes;
 }
 
-// Simple grid layout for root nodes
-export function autoLayoutNodes(nodes: Node[], config: Partial<LayoutConfig> = {}): Node[] {
+// Simple grid layout for root nodes with port-aware positioning
+export function autoLayoutNodes(nodes: Node[], diagram?: Diagram, config: Partial<LayoutConfig> = {}): Node[] {
   const cfg = { ...DEFAULT_CONFIG, ...config };
   let newNodes = [...nodes];
   
@@ -138,11 +189,44 @@ export function autoLayoutNodes(nodes: Node[], config: Partial<LayoutConfig> = {
   
   if (rootNodes.length === 0) return newNodes;
   
-  // Calculate grid dimensions
-  const cols = Math.ceil(Math.sqrt(rootNodes.length));
+  // Build map of port-connected nodes if diagram is provided
+  const portConnections = new Map<string, { portNodeId: string, portId: string, port?: Port }>();
+  if (diagram) {
+    diagram.connectors.forEach(conn => {
+      // Check if external node connects to a port
+      if (conn.targetPort && !getNodeParent(conn.source, newNodes)) {
+        // External source connects to target's port
+        portConnections.set(conn.source, {
+          portNodeId: conn.target,
+          portId: conn.targetPort,
+          port: diagram.ports.find(p => p.id === conn.targetPort)
+        });
+      } else if (conn.sourcePort && !getNodeParent(conn.target, newNodes)) {
+        // External target connects to source's port
+        portConnections.set(conn.target, {
+          portNodeId: conn.source,
+          portId: conn.sourcePort,
+          port: diagram.ports.find(p => p.id === conn.sourcePort)
+        });
+      }
+    });
+  }
   
-  // Position root nodes in a grid
-  rootNodes.forEach((rootNode, index) => {
+  // Helper to check if node has a parent
+  function getNodeParent(nodeId: string, nodes: Node[]): string | undefined {
+    const node = nodes.find(n => n.id === nodeId);
+    return node?.parentId;
+  }
+  
+  // Separate port-connected nodes from grid nodes
+  const portConnectedNodes = rootNodes.filter(n => portConnections.has(n.id));
+  const gridNodes = rootNodes.filter(n => !portConnections.has(n.id));
+  
+  // Calculate grid dimensions for non-port-connected nodes
+  const cols = Math.ceil(Math.sqrt(gridNodes.length));
+  
+  // Position grid nodes first
+  gridNodes.forEach((rootNode, index) => {
     const row = Math.floor(index / cols);
     const col = index % cols;
     
@@ -160,6 +244,103 @@ export function autoLayoutNodes(nodes: Node[], config: Partial<LayoutConfig> = {
     // Calculate final grid position
     const newX = cfg.startX + col * (bounds.width + cfg.horizontalSpacing);
     const newY = cfg.startY + row * (bounds.height + cfg.verticalSpacing);
+    
+    // Calculate delta to move from temp to final position
+    const deltaX = newX - tempX;
+    const deltaY = newY - tempY;
+    
+    // Update root node position
+    const nodeIndex = newNodes.findIndex(n => n.id === rootNode.id);
+    if (nodeIndex !== -1) {
+      newNodes[nodeIndex] = { ...newNodes[nodeIndex], x: newX, y: newY };
+    }
+    
+    // Move all descendants by the delta
+    const moveAllDescendants = (parentId: string) => {
+      const descendants = newNodes.filter(n => n.parentId === parentId);
+      descendants.forEach(desc => {
+        const descIndex = newNodes.findIndex(n => n.id === desc.id);
+        if (descIndex !== -1) {
+          newNodes[descIndex] = {
+            ...newNodes[descIndex],
+            x: newNodes[descIndex].x + deltaX,
+            y: newNodes[descIndex].y + deltaY
+          };
+        }
+        moveAllDescendants(desc.id);
+      });
+    };
+    moveAllDescendants(rootNode.id);
+  });
+  
+  // Now position port-connected nodes next to their ports
+  portConnectedNodes.forEach((rootNode) => {
+    const connection = portConnections.get(rootNode.id);
+    if (!connection || !connection.port) return;
+    
+    // Find the parent component that owns the port
+    const portParentNode = newNodes.find(n => n.id === connection.portNodeId);
+    if (!portParentNode) return;
+    
+    // Calculate port coordinates based on parent node bounds and port side
+    const bounds = getNodePositionBounds(portParentNode, newNodes);
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    
+    let portX = centerX;
+    let portY = centerY;
+    
+    switch (connection.port.side) {
+      case 'left':
+        portX = centerX - width / 2;
+        break;
+      case 'right':
+        portX = centerX + width / 2;
+        break;
+      case 'top':
+        portY = centerY - height / 2;
+        break;
+      case 'bottom':
+        portY = centerY + height / 2;
+        break;
+    }
+    
+    // Calculate position based on port side
+    const spacing = 400; // Distance from port to external node
+    let newX = portX;
+    let newY = portY;
+    
+    switch (connection.port.side) {
+      case 'left':
+        newX = portX - spacing;
+        newY = portY;
+        break;
+      case 'right':
+        newX = portX + spacing;
+        newY = portY;
+        break;
+      case 'top':
+        newX = portX;
+        newY = portY - spacing;
+        break;
+      case 'bottom':
+        newX = portX;
+        newY = portY + spacing;
+        break;
+      default:
+        // Default to left
+        newX = portX - spacing;
+        newY = portY;
+    }
+    
+    // Store temp position
+    const tempX = rootNode.x || 0;
+    const tempY = rootNode.y || 0;
+    
+    // Layout children first at temp position
+    newNodes = layoutChildrenInParent(rootNode.id, tempX, tempY, newNodes);
     
     // Calculate delta to move from temp to final position
     const deltaX = newX - tempX;

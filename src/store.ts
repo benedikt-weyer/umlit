@@ -45,7 +45,7 @@ const initializeDiagram = () => {
       };
   }
   
-  const layoutedNodes = autoLayoutNodes(initialDiagram.nodes);
+  const layoutedNodes = autoLayoutNodes(initialDiagram.nodes, initialDiagram);
   const layoutedCode = updateCodeWithPositions(DEFAULT_CODE, layoutedNodes);
   const { diagram: layoutedDiagram, error: layoutError, ast: layoutAST, tokens: layoutTokens } = parseDiagram(layoutedCode);
   
@@ -158,7 +158,7 @@ export const useStore = create<AppState>((set) => ({
         };
       }
       
-      const layoutedNodes = autoLayoutNodes(diagram.nodes);
+      const layoutedNodes = autoLayoutNodes(diagram.nodes, diagram);
       const layoutedCode = updateCodeWithPositions(DEFAULT_CODE, layoutedNodes);
       const { diagram: layoutedDiagram, error: layoutError, ast: layoutAST, tokens: layoutTokens } = parseDiagram(layoutedCode);
       
@@ -173,7 +173,7 @@ export const useStore = create<AppState>((set) => ({
   autoLayout: () =>
     set((state) => {
       // Apply auto-layout algorithm
-      const layoutedNodes = autoLayoutNodes(state.diagram.nodes);
+      const layoutedNodes = autoLayoutNodes(state.diagram.nodes, state.diagram);
       
       // Update code with new positions
       const newCode = updateCodeWithPositions(state.code, layoutedNodes);
